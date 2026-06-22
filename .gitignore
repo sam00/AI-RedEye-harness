@@ -74,7 +74,8 @@ Thumbs.db
 *_report.sarif
 *_errors.jsonl
 run_manifest.json
-# But this exclusion clears the way for the Markdown report TEMPLATE files
-# that emitter modules ship, if any are added to the package later.
-!redeye/output/**
-!redeye/skills/prompts/**
+# Re-include Python source under directories whose name collides with the
+# scan-output anchors above. Only `.py` and `.md` files so that local
+# __pycache__/ under these dirs stays ignored.
+!redeye/output/**/*.py
+!redeye/skills/prompts/**/*.md
