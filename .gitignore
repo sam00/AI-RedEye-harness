@@ -63,12 +63,18 @@ Thumbs.db
 *.log
 *.pid
 
-# Scan output (do not commit findings)
-out/
-output/
-scans/
-security-scan/
+# Scan output (do not commit findings). Anchored to the repo root with a
+# leading slash so they DO NOT shadow legitimate source directories with the
+# same name (e.g. `redeye/output/` is the emitters package, not scan output).
+/out/
+/output/
+/scans/
+/security-scan/
 *_report.md
 *_report.sarif
 *_errors.jsonl
 run_manifest.json
+# But this exclusion clears the way for the Markdown report TEMPLATE files
+# that emitter modules ship, if any are added to the package later.
+!redeye/output/**
+!redeye/skills/prompts/**
