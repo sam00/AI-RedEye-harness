@@ -1,0 +1,112 @@
+# Full profile — multi-backend layout. Discovery stages run cheap on
+# Anthropic SDK, deep research on Claude CLI, adversarial review uses an
+# OpenAI-compatible model so a different model family votes against the
+# Anthropic findings (genuinely independent voters).
+#
+# Cost expectations are higher than `default` but voting kills more FPs.
+
+name: full
+
+roles:
+  surveyor:
+    via: sdk
+    model: claude-haiku-4
+    temperature: 0.0
+    max_tokens: 4096
+  researcher:
+    via: cli
+    model: claude-sonnet-4-6
+    max_tokens: 8192
+    extra: { tools: [Read, Glob, Grep, Bash] }
+  adversary_a:
+    via: sdk
+    model: claude-sonnet-4-6
+    temperature: 0.2
+    max_tokens: 8192
+  adversary_b:
+    via: openai
+    model: gpt-4o
+    temperature: 0.2
+    max_tokens: 8192
+  reporter:
+    via: sdk
+    model: claude-haiku-4
+    temperature: 0.0
+    max_tokens: 4096
+  validator:
+    # Cheap, fast model for the single-pass S6.5 TP/FP gate.
+    via: sdk
+    model: claude-haiku-4
+    temperature: 0.0
+    max_tokens: 1024
+
+stages:
+  s1_attack_surface:
+    skill: attack_surface_mapper
+    role: surveyor
+    max_budget_usd: 0.40
+  s1b_structural:
+    # Deterministic regex/AST pre-index. Zero LLM cost; massive precision lift.
+    skill: structural_index
+    role: surveyor
+    max_budget_usd: 0.0
+  s2_threat_model:
+    skill: threat_modeler
+    role: surveyor
+    max_budget_usd: 0.40
+  s3_strategize:
+    skill: research_strategist
+    role: researcher
+    max_budget_usd: 0.50
+  s4_research:
+    skill: research_lenses
+    role: researcher
+    max_budget_usd: 6.00
+    params:
+      lenses: [language, crypto, logic, access_control, iac]
+  s4b_grounding:
+    # Verify every cited file:line against the actual source. No LLM.
+    # In strict mode (set via --strict-grounding), hallucinated paths are
+    # dropped instead of merely tagged.
+    skill: grounding_pass
+    role: surveyor
+    max_budget_usd: 0.0
+    params:
+      strict: false
+  s5_policy_gate:
+    skill: policy_gate
+    role: surveyor
+    max_budget_usd: 0.20
+  s6_adversarial:
+    skill: adversarial_reviewer
+    role: adversary_a
+    max_budget_usd: 4.00
+  s6b_validator:
+    skill: validator
+    role: validator
+    max_budget_usd: 0.50
+  s7_dedupe:
+    skill: dedupe
+    role: reporter
+    max_budget_usd: 0.10
+  s8_chain:
+    skill: exploit_strategist
+    role: reporter
+    max_budget_usd: 1.50
+  s8b_poc:
+    # Demand a concrete exploit string. Findings without one get demoted by
+    # one severity notch (or dropped under --require-poc).
+    skill: poc_gate
+    role: validator      # cheap Haiku-class model is enough
+    max_budget_usd: 1.00
+    params:
+      strict: false
+  s9_emit:
+    skill: emit
+    role: reporter
+    max_budget_usd: 0.10
+
+voting:
+  enabled: true
+  quorum: 2
+  voters: [adversary_a, adversary_b, researcher]

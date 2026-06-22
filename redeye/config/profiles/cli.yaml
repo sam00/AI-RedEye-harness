@@ -1,0 +1,73 @@
+# cli profile — same as default but with the Bash tool enabled in agentic
+# stages, so the model can shell out (rg, jq, etc.) inside its sandbox.
+#
+# Use when the model needs to actually run grep/AST queries during research.
+
+name: cli
+
+roles:
+  surveyor:
+    via: cli
+    model: claude-sonnet-4-6
+    max_tokens: 4096
+    extra: { tools: [Read, Glob, Grep, Bash] }
+  researcher:
+    via: cli
+    model: claude-sonnet-4-6
+    max_tokens: 8192
+    extra: { tools: [Read, Glob, Grep, Bash] }
+  adversary:
+    via: cli
+    model: claude-sonnet-4-6
+    max_tokens: 8192
+    extra: { tools: [Read, Glob, Grep, Bash] }
+  reporter:
+    via: cli
+    model: claude-sonnet-4-6
+    max_tokens: 4096
+    extra: { tools: [Read] }
+
+stages:
+  s1_attack_surface:
+    skill: attack_surface_mapper
+    role: surveyor
+    max_budget_usd: 0.75
+  s2_threat_model:
+    skill: threat_modeler
+    role: surveyor
+    max_budget_usd: 0.50
+  s3_strategize:
+    skill: research_strategist
+    role: researcher
+    max_budget_usd: 0.50
+  s4_research:
+    skill: research_lenses
+    role: researcher
+    max_budget_usd: 6.00
+    params:
+      lenses: [language, crypto, logic, access_control, iac]
+  s5_policy_gate:
+    skill: policy_gate
+    role: surveyor
+    max_budget_usd: 0.20
+  s6_adversarial:
+    skill: adversarial_reviewer
+    role: adversary
+    max_budget_usd: 3.00
+  s7_dedupe:
+    skill: dedupe
+    role: reporter
+    max_budget_usd: 0.10
+  s8_chain:
+    skill: exploit_strategist
+    role: reporter
+    max_budget_usd: 1.50
+  s9_emit:
+    skill: emit
+    role: reporter
+    max_budget_usd: 0.10
+
+voting:
+  enabled: false
+  quorum: 1
+  voters: [researcher]

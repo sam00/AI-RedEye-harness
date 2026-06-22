@@ -1,0 +1,29 @@
+Red Team Harness
+Copyright 2026 Red Team Harness contributors
+
+This product includes software developed under the Apache License, Version 2.0.
+
+This project's pipeline architecture (three phases / nine stages, multi-agent
+voting for false-positive reduction, structured triage artifacts) is inspired
+by publicly described designs from agentic-SAST research, including:
+
+  - Anthropic's "Project Glasswing" public materials on AI-assisted
+    vulnerability research.
+
+  - Visa's open-source "Visa Vulnerability Agentic Harness" (VVAH),
+    https://github.com/visa/visa-vulnerability-agentic-harness -- Apache-2.0.
+    Influence: pipeline phases, multi-agent voting, skill-based extension,
+    AGENTS.md / CLAUDE.md operating files, SARIF emission patterns.
+
+  - Rivian's open-source "ai-sast",
+    https://github.com/rivian/ai-sast -- Apache-2.0.
+    Influence: GitHub Actions integration, PR-scan / full-scan duality,
+    PR-comment writer with TP/FP feedback checkboxes, feedback-loop
+    storage (SQLite/Databricks), CVSS vectors, DoS limits, multi-cloud
+    LLM backends (Bedrock, Vertex AI, Ollama), webhook notifications.
+
+No code from VVAH or ai-sast is bundled in this repository; influence is
+architectural only and is implemented from scratch here.
+
+All trademarks used herein belong to their respective owners. Use of these
+names does not imply endorsement.

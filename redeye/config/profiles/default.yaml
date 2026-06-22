@@ -1,0 +1,72 @@
+# Default profile — every stage routed through the Claude Code CLI.
+#
+# Best for: laptop / interactive use after `claude login`. No API keys
+# required. Single-pass per finding (no temperature control on `cli`).
+#
+# To customize: copy this file to ./config.yaml and edit. Or pick `full`
+# for multi-backend.
+
+name: default
+
+roles:
+  surveyor:
+    via: cli
+    model: claude-sonnet-4-6
+    max_tokens: 4096
+  researcher:
+    via: cli
+    model: claude-sonnet-4-6
+    max_tokens: 8192
+  adversary:
+    via: cli
+    model: claude-sonnet-4-6
+    max_tokens: 8192
+  reporter:
+    via: cli
+    model: claude-sonnet-4-6
+    max_tokens: 4096
+
+stages:
+  s1_attack_surface:
+    skill: attack_surface_mapper
+    role: surveyor
+    max_budget_usd: 0.50
+  s2_threat_model:
+    skill: threat_modeler
+    role: surveyor
+    max_budget_usd: 0.50
+  s3_strategize:
+    skill: research_strategist
+    role: researcher
+    max_budget_usd: 0.50
+  s4_research:
+    skill: research_lenses
+    role: researcher
+    max_budget_usd: 4.00
+    params:
+      lenses: [language, crypto, logic, access_control, iac]
+  s5_policy_gate:
+    skill: policy_gate
+    role: surveyor
+    max_budget_usd: 0.20
+  s6_adversarial:
+    skill: adversarial_reviewer
+    role: adversary
+    max_budget_usd: 2.00
+  s7_dedupe:
+    skill: dedupe
+    role: reporter
+    max_budget_usd: 0.10
+  s8_chain:
+    skill: exploit_strategist
+    role: reporter
+    max_budget_usd: 1.00
+  s9_emit:
+    skill: emit
+    role: reporter
+    max_budget_usd: 0.10
+
+voting:
+  enabled: false   # cli backend has no temperature control ? single-pass.
+  quorum: 1
+  voters: [researcher]

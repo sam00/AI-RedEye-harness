@@ -1,0 +1,60 @@
+# Mock profile — every stage uses the deterministic, no-network mock backend.
+#
+# Use for: CI smoke tests, demos to people who haven't configured credentials,
+# local development of new skills.
+
+name: mock
+
+roles:
+  surveyor:
+    via: mock
+    model: mock-fast
+    temperature: 0.0
+    max_tokens: 1024
+  researcher:
+    via: mock
+    model: mock-deep
+    temperature: 0.0
+    max_tokens: 2048
+  adversary:
+    via: mock
+    model: mock-deep
+    temperature: 0.0
+    max_tokens: 2048
+  reporter:
+    via: mock
+    model: mock-fast
+    temperature: 0.0
+    max_tokens: 1024
+
+stages:
+  s1_attack_surface: { skill: attack_surface_mapper, role: surveyor, max_budget_usd: 0.0 }
+  s1b_structural:    { skill: structural_index,      role: surveyor, max_budget_usd: 0.0 }
+  s2_threat_model:   { skill: threat_modeler,        role: surveyor, max_budget_usd: 0.0 }
+  s3_strategize:     { skill: research_strategist,   role: researcher, max_budget_usd: 0.0 }
+  s4_research:
+    skill: research_lenses
+    role: researcher
+    max_budget_usd: 0.0
+    params: { lenses: [language, crypto, logic, access_control, iac] }
+  s4b_grounding:
+    skill: grounding_pass
+    role: surveyor              # role unused (no LLM); listed for schema completeness
+    max_budget_usd: 0.0
+    params: { strict: false }
+  s5_policy_gate:    { skill: policy_gate,           role: surveyor, max_budget_usd: 0.0 }
+  s6_adversarial:    { skill: adversarial_reviewer,  role: adversary, max_budget_usd: 0.0 }
+  s6b_validator:     { skill: validator,             role: adversary, max_budget_usd: 0.0 }
+  s7_dedupe:         { skill: dedupe,                role: reporter, max_budget_usd: 0.0 }
+  s8_chain:          { skill: exploit_strategist,    role: reporter, max_budget_usd: 0.0 }
+  s8b_poc:
+    skill: poc_gate
+    role: reporter
+    max_budget_usd: 0.0
+    params: { strict: false }
+  s9_emit:           { skill: emit,                  role: reporter, max_budget_usd: 0.0 }
+
+voting:
+  enabled: true
+  quorum: 1
+  voters: [researcher, adversary]

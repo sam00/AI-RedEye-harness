@@ -1,0 +1,4 @@
+path,application_id
+/path/to/checkout-service,APP-001
+/path/to/billing-api,APP-002
+/path/to/identity-service,APP-003
