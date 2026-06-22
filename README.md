@@ -110,7 +110,7 @@ redeye scan --repo .  --strict-grounding         # drop findings with bad paths
 redeye scan --repo .  --require-poc              # drop findings without a runnable PoC
 ```
 
-## What's new in 0.2 (vs 0.1 / `agenticsec-harness`)
+## Highlights -- the operational layer
 
 Operational layer (CI/CD + feedback):
 
@@ -120,10 +120,10 @@ Operational layer (CI/CD + feedback):
 - **Custom prompts** — `--custom-prompt-file` appended to every system prompt; useful for "focus on payment paths" or "ignore CWE-200 in /admin".
 - **Validator stage (S6.5)** — single-pass TP/FP gate, distinct from voting; cheap on Haiku / Gemini Flash.
 - **PR comment writer** — `--pr-comment ./out/comment.md` produces a Markdown comment with `[ ] True Positive` / `[ ] False Positive` checkboxes.
-- **Feedback loop** — `--store-findings` persists to SQLite (`~/.redteam-harness/scans.db`); `--use-feedback` injects prior TP / FP marks into the next scan's lens prompts.
+- **Feedback loop** — `--store-findings` persists to SQLite (`~/.redeye/scans.db`); `--use-feedback` injects prior TP / FP marks into the next scan's lens prompts.
 - **`collect-feedback` subcommand** — parses a PR comment, writes verdicts to the store. Triggered by the `issue_comment.edited` GHA event.
 - **Webhooks** — `--webhook-url` + `--webhook-type slack|teams|discord|generic` with optional HMAC signing via `REDEYE_WEBHOOK_SECRET`.
-- **GitHub Actions workflow** — PR scan + full scan + feedback collection in one drop-in YAML at `.github/workflows/redteam-scan.yml`.
+- **GitHub Actions workflow** — PR scan + full scan + feedback collection in one drop-in YAML at `.github/workflows/redeye-scan.yml`.
 - **CVSS** — every finding can carry a `cvss_vector` and `cvss_score`; SARIF emits both, plus `security-severity` for GitHub Code Scanning.
 - **New backends** — `bedrock` (AWS Claude), `vertex` (Gemini), `ollama` (local).
 
@@ -242,7 +242,7 @@ Drop the prebuilt workflow into your repo:
 
 ```bash
 mkdir -p .github/workflows
-cp /path/to/redeye/.github/workflows/redteam-scan.yml .github/workflows/
+cp /path/to/redeye/.github/workflows/redeye-scan.yml .github/workflows/
 ```
 
 It runs:
@@ -267,7 +267,7 @@ Per target, under `<output_dir>`:
 - **LLM-generated, non-deterministic.** Findings are triage candidates, not confirmed vulns. Two runs can differ.
 - **Token-hungry.** Caps are per-stage. Use `redeye estimate` and the DoS limits.
 - **Elevated privilege.** Run only against trusted repositories by authorized operators.
-- **Feedback loop is local-first.** SQLite at `~/.redteam-harness/scans.db` (configurable via `REDEYE_DB_PATH`). Databricks backend is on the roadmap.
+- **Feedback loop is local-first.** SQLite at `~/.redeye/scans.db` (configurable via `REDEYE_DB_PATH`). Databricks backend is on the roadmap.
 
 See `docs/` for the full reference.
 

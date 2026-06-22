@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 from redeye import __version__
-from redeye.errors import AgenticSecError
+from redeye.errors import RedEyeError
 
 console = Console()
 
@@ -84,7 +84,7 @@ def setup(ctx: click.Context, install_agents: bool, profile: str | None) -> None
 
     try:
         run_setup(console=ctx.obj["console"], install_agents=install_agents, profile=profile)
-    except AgenticSecError as exc:
+    except RedEyeError as exc:
         console.print(f"[red]setup failed:[/red] {exc}")
         sys.exit(2)
 
@@ -111,7 +111,7 @@ def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
 
     try:
         run_estimate(console=ctx.obj["console"], repo=Path(repo), profile=profile)
-    except AgenticSecError as exc:
+    except RedEyeError as exc:
         console.print(f"[red]estimate failed:[/red] {exc}")
         sys.exit(2)
 
@@ -161,7 +161,7 @@ def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
 @click.option(
     "--store-findings",
     is_flag=True,
-    help="Persist findings to the SQLite findings DB (~/.redteam-harness/scans.db).",
+    help="Persist findings to the SQLite findings DB (~/.redeye/scans.db).",
 )
 @click.option(
     "--use-feedback",
@@ -323,7 +323,7 @@ def scan(
             require_poc=require_poc,
         )
         sys.exit(rc)
-    except AgenticSecError as exc:
+    except RedEyeError as exc:
         console.print(f"[red]scan failed:[/red] {exc}")
         sys.exit(2)
 

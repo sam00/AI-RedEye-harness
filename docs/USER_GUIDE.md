@@ -95,7 +95,7 @@ gh issue comment view --json body | jq -r .body | redeye collect-feedback
 | `--comment-file PATH` | Read the comment body from a file (default: stdin). |
 
 Writes verdicts to the SQLite store at `$REDEYE_DB_PATH` or
-`~/.redteam-harness/scans.db`. The next scan that runs with `--use-feedback`
+`~/.redeye/scans.db`. The next scan that runs with `--use-feedback`
 will pick them up.
 
 See [`CI_AND_FEEDBACK.md`](CI_AND_FEEDBACK.md) for the full feedback-loop walkthrough.

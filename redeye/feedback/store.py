@@ -80,7 +80,7 @@ class FindingsStore:
         env = os.environ.get("REDEYE_DB_PATH")
         if env:
             return cls(Path(os.path.expanduser(env)))
-        return cls(Path.home() / ".redteam-harness" / "scans.db")
+        return cls(Path.home() / ".redeye" / "scans.db")
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path))

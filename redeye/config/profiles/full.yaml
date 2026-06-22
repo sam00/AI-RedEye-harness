@@ -1,7 +1,9 @@
-# Full profile — multi-backend layout. Discovery stages run cheap on
-# Anthropic SDK, deep research on Claude CLI, adversarial review uses an
-# OpenAI-compatible model so a different model family votes against the
-# Anthropic findings (genuinely independent voters).
+# Full profile -- multi-backend layout.
+#
+# Discovery stages run on a cheap model via the `sdk` backend; deep
+# research runs through the `cli` backend; adversarial review and one of
+# the voters use the `openai` backend so a different model family votes
+# against the rest (genuinely independent voters).
 #
 # Cost expectations are higher than `default` but voting kills more FPs.
 

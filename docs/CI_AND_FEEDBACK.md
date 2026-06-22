@@ -84,7 +84,7 @@ The HTML comment markers are deliberate -- they're how
        - [FP] CWE-200 Information disclosure in test fixture (tests/...)
 ```
 
-The store is local-first SQLite at `~/.redteam-harness/scans.db` (override
+The store is local-first SQLite at `~/.redeye/scans.db` (override
 with `REDEYE_DB_PATH`). It has two tables, `scans` and `findings`, both
 keyed on a deterministic `scan_id = "<target_sha>--<started_at>"`.
 
@@ -104,7 +104,7 @@ uses plain `content`; `generic` is a flat JSON.
 
 ## The GitHub Actions workflow
 
-`.github/workflows/redteam-scan.yml` packages all three modes:
+`.github/workflows/redeye-scan.yml` packages all three modes:
 
 ```yaml
 on:

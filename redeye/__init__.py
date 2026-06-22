@@ -10,16 +10,16 @@ from __future__ import annotations
 __version__ = "0.3.0"
 
 from redeye.errors import (
-    AgenticSecError,
     BackendError,
     ConfigError,
     PipelineError,
+    RedEyeError,
 )
 from redeye.schema import Finding, Severity
 
 __all__ = [
     "__version__",
-    "AgenticSecError",
+    "RedEyeError",
     "BackendError",
     "ConfigError",
     "PipelineError",

@@ -61,6 +61,6 @@ produces a deterministic report. Use this for CI and demos.
 
 - Type hints on every public function.
 - `pydantic` for schemas, `dataclasses` for plain records.
-- Public errors are subclasses of `redeye.errors.AgenticSecError`.
+- Public errors are subclasses of `redeye.errors.RedEyeError`.
 - Tests live under `tests/`, mirror the package layout, and never hit a
   live LLM endpoint — use the `mock` backend.
