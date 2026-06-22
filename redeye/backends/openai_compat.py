@@ -76,7 +76,11 @@ class OpenAIBackend(BackendBase):
         client = self._get_client()
         if client is None or not self.has_credential():
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
         try:
             kwargs: dict[str, Any] = {
@@ -93,7 +97,11 @@ class OpenAIBackend(BackendBase):
         except Exception as exc:  # noqa: BLE001
             log.warning("OpenAI call failed (%s) — falling back to mock.", exc)
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
 
         text = ""
@@ -107,5 +115,10 @@ class OpenAIBackend(BackendBase):
         out_price = _PRICE_PER_MTOK_OUT.get(model, 15.0) / 1_000_000
         cost = tokens_in * in_price + tokens_out * out_price
         return CompletionResult(
-            text=text, tokens_in=tokens_in, tokens_out=tokens_out, cost_usd=cost, model=model, raw=resp
+            text=text,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            cost_usd=cost,
+            model=model,
+            raw=resp,
         )

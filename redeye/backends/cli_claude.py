@@ -68,7 +68,11 @@ class ClaudeCliBackend(BackendBase):
                 "Run `claude login` or set CLAUDE_CODE_OAUTH_TOKEN to use the real CLI."
             )
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
 
         cmd: list[Any] = [
@@ -96,13 +100,25 @@ class ClaudeCliBackend(BackendBase):
         except subprocess.SubprocessError as exc:
             log.warning("claude CLI invocation failed: %s — falling back to mock.", exc)
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
 
         if proc.returncode != 0:
-            log.warning("claude CLI exited %d: %s — falling back to mock.", proc.returncode, proc.stderr[:300])
+            log.warning(
+                "claude CLI exited %d: %s — falling back to mock.",
+                proc.returncode,
+                proc.stderr[:300],
+            )
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
 
         text = proc.stdout

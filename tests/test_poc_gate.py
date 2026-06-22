@@ -12,7 +12,7 @@ from redeye.skills.poc_gate import _is_concrete, gate_findings
 def test_is_concrete_for_real_curl() -> None:
     assert _is_concrete(
         "admin' OR 1=1 --",
-        "curl -X POST http://localhost/api -d '{\"u\": \"admin\\u0027 OR 1=1 --\"}'",
+        'curl -X POST http://localhost/api -d \'{"u": "admin\\u0027 OR 1=1 --"}\'',
     )
 
 

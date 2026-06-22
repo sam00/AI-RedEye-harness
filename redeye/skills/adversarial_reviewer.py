@@ -39,7 +39,8 @@ def review_findings(
     for f in findings:
         prompt = (
             f"Title: {f.title}\nSeverity: {f.severity.value}\nCWE: {f.cwe or 'unknown'}\n"
-            f"Locations: " + "; ".join(f"{loc.path}:{loc.start_line}" for loc in f.locations)
+            f"Locations: "
+            + "; ".join(f"{loc.path}:{loc.start_line}" for loc in f.locations)
             + f"\n\nDescription:\n{f.description}\n\n"
             f"Existing attack chain:\n" + json.dumps(f.attack_chain, indent=2)
         )

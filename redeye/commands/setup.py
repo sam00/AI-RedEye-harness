@@ -108,9 +108,7 @@ def _credential_status() -> list[tuple[str, str, str, bool]]:
                 and (
                     os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
                     or os.path.exists(
-                        os.path.expanduser(
-                            "~/.config/gcloud/application_default_credentials.json"
-                        )
+                        os.path.expanduser("~/.config/gcloud/application_default_credentials.json")
                     )
                 )
             ),

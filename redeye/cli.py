@@ -102,7 +102,9 @@ def doctor(ctx: click.Context, profile: str | None, no_network: bool) -> None:
 
 
 @main.command()
-@click.option("--repo", required=True, type=click.Path(exists=True, file_okay=False), help="Path to repo.")
+@click.option(
+    "--repo", required=True, type=click.Path(exists=True, file_okay=False), help="Path to repo."
+)
 @click.option("--profile", default=None, help="Profile to use for cost model.")
 @click.pass_context
 def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
@@ -131,7 +133,12 @@ def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
     default=None,
     help="Workspace directory for batch scans.",
 )
-@click.option("--output-dir", type=click.Path(file_okay=False), default=None, help="Override output directory.")
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Override output directory.",
+)
 @click.option("--group-by-app", is_flag=True, help="Emit one report per AppId.")
 @click.option("--keep-clones", is_flag=True, help="Retain cloned repos after scanning.")
 @click.option("--dry-run", is_flag=True, help="Plan but do not execute LLM calls.")
@@ -149,8 +156,12 @@ def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
     help="Substring of paths to exclude (repeatable).",
 )
 @click.option("--max-files", type=int, default=0, help="Cap files scanned (0 = unlimited).")
-@click.option("--max-file-bytes", type=int, default=0, help="Skip files larger than this many bytes.")
-@click.option("--max-total-bytes", type=int, default=0, help="Stop scanning once cumulative bytes exceed.")
+@click.option(
+    "--max-file-bytes", type=int, default=0, help="Skip files larger than this many bytes."
+)
+@click.option(
+    "--max-total-bytes", type=int, default=0, help="Stop scanning once cumulative bytes exceed."
+)
 # --- Customisation / feedback ----------------------------------------------
 @click.option(
     "--custom-prompt-file",
@@ -270,8 +281,7 @@ def scan(
         explicit = {
             name
             for name in local_flags
-            if ctx.get_parameter_source(name)
-            == click.core.ParameterSource.COMMANDLINE
+            if ctx.get_parameter_source(name) == click.core.ParameterSource.COMMANDLINE
         }
         merged = apply_preset(preset, explicit_flags=explicit, current_kwargs=local_flags)
 
@@ -346,7 +356,9 @@ def scan(
     help="Where to write the rendered .env (default: ./.env).",
 )
 @click.pass_context
-def init(ctx: click.Context, non_interactive: bool, write_config: bool, env_path: str | None) -> None:
+def init(
+    ctx: click.Context, non_interactive: bool, write_config: bool, env_path: str | None
+) -> None:
     """Interactive setup wizard -- detect creds, pick a profile, write .env."""
     from redeye.commands.init import run as run_init
 

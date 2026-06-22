@@ -98,9 +98,13 @@ def validate_findings(
         # on local models. Confirm it for free and move on.
         if "deterministic" in f.tags:
             f.validator_verdict = "confirm"
-            f.validator_rationale = "deterministic-floor: structurally corroborated; not subject to LLM veto"
+            f.validator_rationale = (
+                "deterministic-floor: structurally corroborated; not subject to LLM veto"
+            )
             f.evidence.append(
-                Evidence(kind="validator", check="pass", detail="deterministic floor (structural_hit)")
+                Evidence(
+                    kind="validator", check="pass", detail="deterministic floor (structural_hit)"
+                )
             )
             f.tags.append("validator:deterministic-floor")
             kept.append(f)
@@ -121,8 +125,7 @@ def validate_findings(
 
         # Compose a compact dossier for the validator.
         evidence_summary = [
-            {"kind": e.kind, "check": e.check, "detail": e.detail[:200]}
-            for e in f.evidence[:8]
+            {"kind": e.kind, "check": e.check, "detail": e.detail[:200]} for e in f.evidence[:8]
         ]
         taint_summary = {
             "source": f.taint.source,
@@ -161,7 +164,13 @@ def validate_findings(
             rationale = str(parsed.get("rationale", ""))[:1500]
         f.validator_verdict = verdict
         f.validator_rationale = rationale
-        f.evidence.append(Evidence(kind="validator", check={"confirm": "pass", "reject": "fail"}.get(verdict, "unknown"), detail=rationale[:300]))
+        f.evidence.append(
+            Evidence(
+                kind="validator",
+                check={"confirm": "pass", "reject": "fail"}.get(verdict, "unknown"),
+                detail=rationale[:300],
+            )
+        )
         if verdict == "reject":
             f.tags.append("dropped:validator:reject")
             rejected.append(f)

@@ -30,7 +30,9 @@ def run(*, console: Console, profile: str | None, no_network: bool) -> int:
     for backend_name in required_backends:
         factory = BACKENDS.get(backend_name)
         if factory is None:
-            table.add_row(backend_name, "[red]unknown[/red]", "[red]FAIL[/red]", "no factory registered")
+            table.add_row(
+                backend_name, "[red]unknown[/red]", "[red]FAIL[/red]", "no factory registered"
+            )
             overall_ok = False
             continue
         try:
@@ -60,7 +62,6 @@ def run(*, console: Console, profile: str | None, no_network: bool) -> int:
         console.print("\n[green]All required backends are operable.[/green]")
         return 0
     console.print(
-        "\n[red]One or more backends failed.[/red] "
-        "Run [cyan]redeye setup[/cyan] for guidance."
+        "\n[red]One or more backends failed.[/red] Run [cyan]redeye setup[/cyan] for guidance."
     )
     return 1

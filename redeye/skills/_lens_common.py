@@ -44,7 +44,9 @@ def _normalise_severity(value: Any) -> Severity:
     return Severity.MEDIUM
 
 
-def _location_from(record: dict[str, Any], *, key_path: str = "path", key_line: str = "start_line") -> Location | None:
+def _location_from(
+    record: dict[str, Any], *, key_path: str = "path", key_line: str = "start_line"
+) -> Location | None:
     p = record.get(key_path) or record.get("file")
     if not p:
         return None

@@ -95,11 +95,18 @@ def vote_on_findings(findings: list[Finding], profile: Profile) -> VotingOutcome
                 )
             except Exception as exc:  # noqa: BLE001
                 finding.votes.append(
-                    Vote(role=voter_role, model=model, verdict="uncertain", rationale=f"backend error: {exc}")
+                    Vote(
+                        role=voter_role,
+                        model=model,
+                        verdict="uncertain",
+                        rationale=f"backend error: {exc}",
+                    )
                 )
                 continue
             verdict, rationale = _parse_verdict(result.text)
-            finding.votes.append(Vote(role=voter_role, model=model, verdict=verdict, rationale=rationale))
+            finding.votes.append(
+                Vote(role=voter_role, model=model, verdict=verdict, rationale=rationale)
+            )
             if verdict == "confirm":
                 confirms += 1
 

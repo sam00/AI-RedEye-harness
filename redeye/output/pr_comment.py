@@ -48,11 +48,7 @@ def _render_one(f: Finding, scan_id: str) -> list[str]:
         if f.cvss_vector
         else "**CVSS Vector:** _not provided_"
     )
-    score_line = (
-        f"**CVSS Score:** {f.cvss_score:.1f}"
-        if f.cvss_score is not None
-        else ""
-    )
+    score_line = f"**CVSS Score:** {f.cvss_score:.1f}" if f.cvss_score is not None else ""
     parts = [
         f"<!-- vuln-id: {f.id} scan-id: {scan_id} -->",
         "- [ ] :white_check_mark: True Positive",
@@ -69,8 +65,7 @@ def _render_one(f: Finding, scan_id: str) -> list[str]:
         parts.append(score_line + "  ")
     if f.validator_verdict:
         parts.append(
-            f"**Validator**: `{f.validator_verdict}` -- "
-            f"{(f.validator_rationale or '')[:160]}  "
+            f"**Validator**: `{f.validator_verdict}` -- {(f.validator_rationale or '')[:160]}  "
         )
     parts.extend(
         [

@@ -20,9 +20,7 @@ def _seed(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     (tmp_path / "src" / "shell.py").write_text(
-        "import subprocess\n"
-        "def run(cmd):\n"
-        "    subprocess.run(cmd, shell=True)\n",
+        "import subprocess\ndef run(cmd):\n    subprocess.run(cmd, shell=True)\n",
         encoding="utf-8",
     )
     (tmp_path / "config.yaml").write_text(
@@ -45,7 +43,9 @@ def test_index_finds_route_sink_secret(tmp_path: Path) -> None:
 
     assert idx.files_indexed == 4
     # Routes
-    assert any("/users/lookup" in r.snippet or r.snippet == "POST /users/lookup" for r in idx.routes)
+    assert any(
+        "/users/lookup" in r.snippet or r.snippet == "POST /users/lookup" for r in idx.routes
+    )
     # SQL sink: the test code does `q = f"..."` then `cursor.execute(q)`,
     # so the matching pattern is the variable form.
     sink_kinds = {h.kind for h in idx.sinks}

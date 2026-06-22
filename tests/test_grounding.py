@@ -25,7 +25,9 @@ def test_ground_one_passes_for_real_file_with_matching_token(tmp_path: Path) -> 
     target = tmp_path
     f_path = target / "src.py"
     f_path.parent.mkdir(parents=True, exist_ok=True)
-    f_path.write_text("def lookup(u):\n    cursor.execute(f'SELECT * FROM t WHERE n={u}')\n", encoding="utf-8")
+    f_path.write_text(
+        "def lookup(u):\n    cursor.execute(f'SELECT * FROM t WHERE n={u}')\n", encoding="utf-8"
+    )
 
     finding = _f("src.py", 2, cwe="CWE-89")
     ground_one(finding=finding, target=target)
@@ -63,7 +65,7 @@ def test_ground_one_weak_when_tokens_mismatch(tmp_path: Path) -> None:
 def test_strict_grounding_drops_hallucinations(tmp_path: Path) -> None:
     findings = [
         _f("does/not/exist.py", 1),  # hallucinated path
-        _f("nope.py", 9999),           # hallucinated line
+        _f("nope.py", 9999),  # hallucinated line
     ]
     kept, dropped, report = ground_findings(findings=findings, target=tmp_path, strict=True)
     assert kept == []

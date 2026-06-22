@@ -24,12 +24,11 @@ from pathlib import Path
 from typing import Any
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
-    KeepTogether,
     PageBreak,
     Paragraph,
     Preformatted,
@@ -38,7 +37,6 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
-
 
 # ---------------------------------------------------------------------------
 # Styling
@@ -78,12 +76,7 @@ CENTER = _style("Center", "BodyText", fontSize=14, alignment=TA_CENTER)
 
 
 def esc(text: Any) -> str:
-    return (
-        str(text)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def kv_table(rows, col_widths=(1.7 * inch, 4.8 * inch)) -> Table:
@@ -159,9 +152,7 @@ def metrics_table(metrics: dict[str, int]) -> Table:
                 ]
             )
     if len(rows) == 1:
-        rows.append(
-            [Paragraph("<i>(no metrics recorded)</i>", SMALL), Paragraph("-", SMALL)]
-        )
+        rows.append([Paragraph("<i>(no metrics recorded)</i>", SMALL), Paragraph("-", SMALL)])
     t = Table(rows, colWidths=[5.0 * inch, 1.0 * inch], repeatRows=1)
     t.setStyle(
         TableStyle(
@@ -188,9 +179,7 @@ def structural_table(summary: dict[str, Any]) -> Table:
         ("Dangerous sinks", "sinks"),
         ("Suspected secrets", "secrets"),
     ]:
-        rows.append(
-            [Paragraph(label, SMALL), Paragraph(f"<b>{summary.get(key, 0)}</b>", SMALL)]
-        )
+        rows.append([Paragraph(label, SMALL), Paragraph(f"<b>{summary.get(key, 0)}</b>", SMALL)])
     t = Table(rows, colWidths=[4.0 * inch, 1.0 * inch], repeatRows=1)
     t.setStyle(
         TableStyle(
@@ -257,17 +246,16 @@ def render_finding(f: dict) -> list:
     out: list = []
     locs = f.get("locations") or []
     primary = locs[0] if locs else {}
-    loc_str = (
-        f"{primary.get('path', 'unknown')}:{primary.get('start_line', '?')}"
-        + (f"-{primary['end_line']}" if primary.get("end_line") else "")
+    loc_str = f"{primary.get('path', 'unknown')}:{primary.get('start_line', '?')}" + (
+        f"-{primary['end_line']}" if primary.get("end_line") else ""
     )
     sev = (f.get("severity") or "").lower()
     sev_color = SEV_COLORS.get(sev, MUTED)
     grounded = "[grounded]" if f.get("grounded") else "[ungrounded]"
     title = (
         f'<font color="{_hex(sev_color)}"><b>[{sev.upper()}]</b></font> '
-        f'{esc(f.get("title", ""))}  '
-        f'<font color="#888888">{f.get("id","")} {grounded}</font>'
+        f"{esc(f.get('title', ''))}  "
+        f'<font color="#888888">{f.get("id", "")} {grounded}</font>'
     )
     out.append(Paragraph(title, H3))
 
@@ -282,8 +270,12 @@ def render_finding(f: dict) -> list:
                 (
                     "CVSS",
                     (
-                        f"{f.get('cvss_vector','')}"
-                        + (f"  (score {f['cvss_score']:.1f})" if f.get("cvss_score") is not None else "")
+                        f"{f.get('cvss_vector', '')}"
+                        + (
+                            f"  (score {f['cvss_score']:.1f})"
+                            if f.get("cvss_score") is not None
+                            else ""
+                        )
                     ).strip()
                     or "-",
                 ),
@@ -308,7 +300,11 @@ def render_finding(f: dict) -> list:
                 (
                     "Source",
                     f"{taint['source']}"
-                    + (f"  at  {src_loc.get('path','')}:{src_loc.get('start_line','')}" if src_loc else ""),
+                    + (
+                        f"  at  {src_loc.get('path', '')}:{src_loc.get('start_line', '')}"
+                        if src_loc
+                        else ""
+                    ),
                 )
             )
         if taint.get("sink"):
@@ -317,7 +313,11 @@ def render_finding(f: dict) -> list:
                 (
                     "Sink",
                     f"{taint['sink']}"
-                    + (f"  at  {snk_loc.get('path','')}:{snk_loc.get('start_line','')}" if snk_loc else ""),
+                    + (
+                        f"  at  {snk_loc.get('path', '')}:{snk_loc.get('start_line', '')}"
+                        if snk_loc
+                        else ""
+                    ),
                 )
             )
         rows.append(("Sanitizer missing", str(taint.get("sanitizer_missing"))))
@@ -326,7 +326,7 @@ def render_finding(f: dict) -> list:
             rows.append(("Sanitizers observed", ", ".join(observed)))
         steps = taint.get("taint_path") or []
         if steps:
-            chain = " -> ".join(f"{s.get('path','')}:{s.get('start_line','')}" for s in steps)
+            chain = " -> ".join(f"{s.get('path', '')}:{s.get('start_line', '')}" for s in steps)
             rows.append(("Path", chain))
         out.append(kv_table(rows, col_widths=(1.4 * inch, 5.1 * inch)))
 
@@ -349,7 +349,9 @@ def render_finding(f: dict) -> list:
                 out.append(Paragraph("<b>Invocation</b>", SMALL))
                 out.append(Preformatted(poc["invocation"][:1500], MONO))
             if poc.get("expected_effect"):
-                out.append(Paragraph(f"<b>Expected effect:</b> {esc(poc['expected_effect'])}", SMALL))
+                out.append(
+                    Paragraph(f"<b>Expected effect:</b> {esc(poc['expected_effect'])}", SMALL)
+                )
         else:
             out.append(
                 Paragraph(
@@ -408,7 +410,10 @@ def _findings_from_manifest(manifest: dict) -> tuple[list[dict], list[dict]]:
         for f in stage.get("findings", []) or []:
             fid = f.get("id")
             if fid and fid not in seen_final and fid not in seen_dropped:
-                if any(t.startswith("dropped:") or t.startswith("hallucinated:") for t in f.get("tags") or []):
+                if any(
+                    t.startswith("dropped:") or t.startswith("hallucinated:")
+                    for t in f.get("tags") or []
+                ):
                     dropped.append(f)
                     seen_dropped.add(fid)
     return final, dropped
@@ -548,7 +553,7 @@ def main() -> int:
                 story.append(
                     Paragraph(
                         f"<b>{esc(h.get('kind', ''))}</b> "
-                        f"<font color=\"888\">{esc(cwe)}</font> -- "
+                        f'<font color="888">{esc(cwe)}</font> -- '
                         f"{esc(h.get('path', ''))}:{h.get('line', '')}",
                         SMALL,
                     )
@@ -569,7 +574,9 @@ def main() -> int:
     story.append(PageBreak())
 
     # ---- Attack surface (S1) and threat model (S2) ----
-    s1 = (stages.get("s1_attack_surface") or {}).get("artifacts", {}).get("attack_surface", {}) or {}
+    s1 = (stages.get("s1_attack_surface") or {}).get("artifacts", {}).get(
+        "attack_surface", {}
+    ) or {}
     if s1:
         story.append(Paragraph("Attack surface (S1)", H2))
         if s1.get("summary"):

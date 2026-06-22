@@ -150,9 +150,7 @@ class FindingsStore:
                 )
         return scan_id
 
-    def record_reviewer_verdict(
-        self, *, scan_id: str, finding_id: str, verdict: str
-    ) -> None:
+    def record_reviewer_verdict(self, *, scan_id: str, finding_id: str, verdict: str) -> None:
         verdict = verdict.upper()
         if verdict not in {"TP", "FP", "UNK"}:
             raise ValueError(f"verdict must be TP|FP|UNK, got {verdict!r}")

@@ -75,7 +75,11 @@ class OllamaBackend(BackendBase):
         except httpx.HTTPError as exc:
             log.warning("Ollama call failed (%s) -- falling back to mock.", exc)
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
 
         text = data.get("message", {}).get("content", "") or ""
@@ -83,5 +87,10 @@ class OllamaBackend(BackendBase):
         tokens_in = int(data.get("prompt_eval_count", 0) or 0)
         tokens_out = int(data.get("eval_count", 0) or 0)
         return CompletionResult(
-            text=text, tokens_in=tokens_in, tokens_out=tokens_out, cost_usd=0.0, model=payload["model"], raw=data
+            text=text,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            cost_usd=0.0,
+            model=payload["model"],
+            raw=data,
         )

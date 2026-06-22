@@ -43,13 +43,13 @@ return {"payload": "", "invocation": "", "expected_effect": "no-poc-possible: <w
 
 # A PoC is "concrete" if it contains at least one of these signals.
 _CONCRETE_SIGNALS = [
-    re.compile(r"['\"][^'\"]{2,}['\"]"),                 # quoted string
-    re.compile(r"https?://"),                             # URL
+    re.compile(r"['\"][^'\"]{2,}['\"]"),  # quoted string
+    re.compile(r"https?://"),  # URL
     re.compile(r"\b(curl|wget|http|GET|POST|PUT|DELETE|PATCH)\b"),
-    re.compile(r"[`;|]"),                                 # shell injection metacharacters
-    re.compile(r"\.\./"),                                 # path traversal
-    re.compile(r"\$\{|<\?|<%"),                           # template injection
-    re.compile(r"<script", re.IGNORECASE),                # XSS
+    re.compile(r"[`;|]"),  # shell injection metacharacters
+    re.compile(r"\.\./"),  # path traversal
+    re.compile(r"\$\{|<\?|<%"),  # template injection
+    re.compile(r"<script", re.IGNORECASE),  # XSS
     re.compile(r"\bUNION\b|\bSELECT\b|\bDROP\b", re.IGNORECASE),  # SQLi
     re.compile(r"jwt|token|cookie|session", re.IGNORECASE),
 ]
@@ -119,7 +119,9 @@ def gate_findings(
         primary = f.locations[0] if f.locations else None
         prompt = (
             f"Title: {f.title}\nSeverity: {f.severity.value}\nCWE: {f.cwe or 'unknown'}\n"
-            f"Location: {primary.path}:{primary.start_line}\n" if primary else ""
+            f"Location: {primary.path}:{primary.start_line}\n"
+            if primary
+            else ""
         )
         prompt += f"\nDescription:\n{f.description}\n"
         if f.taint and (f.taint.source or f.taint.sink):
@@ -131,7 +133,11 @@ def gate_findings(
 
         try:
             completion = backend.complete(
-                system=_SYSTEM, user=prompt, model=model, max_tokens=max_tokens, temperature=temperature
+                system=_SYSTEM,
+                user=prompt,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
         except Exception:  # noqa: BLE001 -- backend errors must never crash the pipeline
             f.tags.append("no-poc:backend-error")

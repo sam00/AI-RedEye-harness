@@ -81,14 +81,8 @@ def run(ctx) -> StageResult:  # type: ignore[no-untyped-def]
     # ``deterministic`` tag that the validator/PoC gates honour as a floor.
     det_count = 0
     if ctx.scope is not None and ctx.scope.files:
-        existing = {
-            (f.cwe, loc.path, loc.start_line)
-            for f in findings
-            for loc in f.locations
-        }
-        det_findings = derive_deterministic_findings(
-            target=ctx.target, file_paths=ctx.scope.files
-        )
+        existing = {(f.cwe, loc.path, loc.start_line) for f in findings for loc in f.locations}
+        det_findings = derive_deterministic_findings(target=ctx.target, file_paths=ctx.scope.files)
         for f in det_findings:
             loc = f.locations[0]
             # Dedupe against a lens finding citing the same CWE within +/-3 lines.

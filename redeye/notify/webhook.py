@@ -42,7 +42,10 @@ def _compose_payload(
                     "type": "context",
                     "elements": [
                         {"type": "mrkdwn", "text": f"profile: `{manifest.profile}`"},
-                        {"type": "mrkdwn", "text": f"target SHA: `{manifest.target_sha or 'unknown'}`"},
+                        {
+                            "type": "mrkdwn",
+                            "text": f"target SHA: `{manifest.target_sha or 'unknown'}`",
+                        },
                     ],
                 },
             ],

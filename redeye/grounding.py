@@ -39,7 +39,9 @@ log = logging.getLogger(__name__)
 # reasoning -- this just keeps it honest about the file:line it cites.
 _CWE_TOKENS: dict[str, list[re.Pattern]] = {
     "CWE-89": [  # SQL injection
-        re.compile(r"(?i)(execute|raw_query|rawQuery|read_sql|query|cursor|prepare|select\s|insert\s|update\s|delete\s)"),
+        re.compile(
+            r"(?i)(execute|raw_query|rawQuery|read_sql|query|cursor|prepare|select\s|insert\s|update\s|delete\s)"
+        ),
         re.compile(r"(?i)(sql|sqlalchemy|psycopg|pymysql|mysql|sqlite|pyodbc|pd\.read|\.format\()"),
     ],
     "CWE-78": [  # OS command injection
@@ -50,7 +52,9 @@ _CWE_TOKENS: dict[str, list[re.Pattern]] = {
         re.compile(r"\.\./|%2e%2e"),
     ],
     "CWE-79": [  # XSS
-        re.compile(r"(?i)\b(innerHTML|dangerouslySetInnerHTML|render_template|html|template|response\.write)\b"),
+        re.compile(
+            r"(?i)\b(innerHTML|dangerouslySetInnerHTML|render_template|html|template|response\.write)\b"
+        ),
     ],
     "CWE-352": [  # CSRF
         re.compile(r"(?i)\b(csrf|samesite|cookie|session|origin|referer)\b"),
@@ -164,7 +168,9 @@ def ground_one(*, finding: Finding, target: Path) -> Finding:
     resolved = _resolve(target, primary.path)
     if resolved is None:
         finding.evidence.append(
-            Evidence(kind="file_exists", check="fail", detail=f"path {primary.path!r} does not exist")
+            Evidence(
+                kind="file_exists", check="fail", detail=f"path {primary.path!r} does not exist"
+            )
         )
         finding.tags.append("hallucinated:bad-path")
         return finding
@@ -186,17 +192,25 @@ def ground_one(*, finding: Finding, target: Path) -> Finding:
         finding.tags.append("hallucinated:bad-line")
         return finding
     finding.evidence.append(
-        Evidence(kind="line_resolves", check="pass", detail=f"line {primary.start_line} of {line_count}")
+        Evidence(
+            kind="line_resolves", check="pass", detail=f"line {primary.start_line} of {line_count}"
+        )
     )
 
     # Snippet match: do tokens for the claimed CWE family appear in a small
     # window around the cited line?
-    window = _read_window(resolved, primary.start_line, primary.locations[0].end_line if False else primary.end_line)
+    window = _read_window(
+        resolved, primary.start_line, primary.locations[0].end_line if False else primary.end_line
+    )
     patterns = _cwe_family_tokens(finding.cwe)
     if patterns:
         if _token_match(window, patterns):
             finding.evidence.append(
-                Evidence(kind="snippet_match", check="pass", detail=f"matched CWE-family tokens for {finding.cwe}")
+                Evidence(
+                    kind="snippet_match",
+                    check="pass",
+                    detail=f"matched CWE-family tokens for {finding.cwe}",
+                )
             )
             finding.grounded = True
             # Capture the window snippet so the report can show it without

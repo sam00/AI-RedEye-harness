@@ -36,18 +36,20 @@ def tiny_repo(tmp_path: Path) -> Path:
         "\n".join(users_lines) + "\n", encoding="utf-8"
     )
 
-    defaults_lines = [
-        "# defaults.yaml",
-        "log_level: INFO",
-    ] + [f"# pad-{i}" for i in range(3, 12)] + [
-        'api_key: "sk-ant-abcdefghijklmnopqrstuvwxyz1234"',
-    ]
+    defaults_lines = (
+        [
+            "# defaults.yaml",
+            "log_level: INFO",
+        ]
+        + [f"# pad-{i}" for i in range(3, 12)]
+        + [
+            'api_key: "sk-ant-abcdefghijklmnopqrstuvwxyz1234"',
+        ]
+    )
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "defaults.yaml").write_text(
         "\n".join(defaults_lines) + "\n", encoding="utf-8"
     )
 
-    (tmp_path / "Dockerfile").write_text(
-        "FROM python:3.11\nUSER root\n", encoding="utf-8"
-    )
+    (tmp_path / "Dockerfile").write_text("FROM python:3.11\nUSER root\n", encoding="utf-8")
     return tmp_path

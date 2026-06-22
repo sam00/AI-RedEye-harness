@@ -32,7 +32,11 @@ def _render_taint(f: Finding) -> str:
         return "_(no taint flow recorded -- this finding may be hand-wavy)_"
     parts = [
         f"- **Source:** `{t.source or '?'}`"
-        + (f" at `{t.source_location.path}:{t.source_location.start_line}`" if t.source_location else ""),
+        + (
+            f" at `{t.source_location.path}:{t.source_location.start_line}`"
+            if t.source_location
+            else ""
+        ),
         f"- **Sink:** `{t.sink or '?'}`"
         + (f" at `{t.sink_location.path}:{t.sink_location.start_line}`" if t.sink_location else ""),
         f"- **Sanitizer missing:** {t.sanitizer_missing}"
@@ -78,9 +82,12 @@ def _render_finding(f: Finding) -> str:
         else "unknown"
     )
     chain = "\n".join(f"  {i + 1}. {step}" for i, step in enumerate(f.attack_chain)) or "  (none)"
-    votes = "\n".join(
-        f"  - **{v.role}** ({v.model}): `{v.verdict}` -- {v.rationale[:160]}" for v in f.votes
-    ) or "  (no votes recorded)"
+    votes = (
+        "\n".join(
+            f"  - **{v.role}** ({v.model}): `{v.verdict}` -- {v.rationale[:160]}" for v in f.votes
+        )
+        or "  (no votes recorded)"
+    )
 
     grounding_badge = "[grounded]" if f.grounded else "[ungrounded]"
     cvss = ""

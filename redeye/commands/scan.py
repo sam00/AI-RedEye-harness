@@ -136,9 +136,7 @@ def run(
         cfg.stages["s8b_poc"].params["strict"] = True
     targets = _resolve_targets(repo, repo_file)
     custom_prompt = _load_custom_prompt(custom_prompt_file)
-    console.rule(
-        f"[bold]redeye scan[/bold] -- profile: {cfg.name} -- targets: {len(targets)}"
-    )
+    console.rule(f"[bold]redeye scan[/bold] -- profile: {cfg.name} -- targets: {len(targets)}")
     if diff_only:
         console.print(f"[dim]Mode: diff-only against {pr_base}[/dim]")
     if exclude_paths:
@@ -157,7 +155,8 @@ def run(
         target_out = (
             output_dir
             if output_dir is not None
-            else (workspace / target_path.name) if workspace is not None
+            else (workspace / target_path.name)
+            if workspace is not None
             else target_path / "security-scan"
         )
         target_out.mkdir(parents=True, exist_ok=True)

@@ -192,7 +192,9 @@ class Scope:
             if not line:
                 continue
             p = self.target / line
-            if p.is_file() and (p.suffix.lower() in _INTERESTING_EXTS or p.name in _INTERESTING_EXTS):
+            if p.is_file() and (
+                p.suffix.lower() in _INTERESTING_EXTS or p.name in _INTERESTING_EXTS
+            ):
                 out.append(p)
         return out
 

@@ -219,7 +219,7 @@ def _stub_poc(digest: str) -> dict[str, Any]:
         "invocation": (
             "curl -X POST http://localhost:8000/api/v1/users/lookup "
             "-H 'Content-Type: application/json' "
-            "-d '{\"username\": \"admin\\u0027 OR 1=1 --\"}'"
+            '-d \'{"username": "admin\\u0027 OR 1=1 --"}\''
         ),
         "expected_effect": (
             f"Mock PoC (digest={digest}). The malformed quote breaks out of the "
@@ -242,11 +242,7 @@ def _stub_response(system: str, user: str) -> str:
     # --- S8b PoC gate -------------------------------------------------------
     # Detect the PoC prompt by the rare combination of "payload" + "invocation"
     # + "expected_effect" tokens in the system instructions.
-    if (
-        "payload" in sys_l
-        and "invocation" in sys_l
-        and "expected_effect" in sys_l
-    ):
+    if "payload" in sys_l and "invocation" in sys_l and "expected_effect" in sys_l:
         payload = _stub_poc(digest)
     # --- voter (S6 multi-agent vote) ----------------------------------------
     elif "verdict" in sys_l and "confirm" in sys_l and "reject" in sys_l:

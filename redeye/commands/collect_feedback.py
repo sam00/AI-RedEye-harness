@@ -37,7 +37,7 @@ def _parse(comment: str) -> list[tuple[str, str, str]]:
         vuln = match.group("vuln")
         scan = match.group("scan")
         # Look at the ~6 lines after the marker for `[x]` or `[X]` checkboxes.
-        tail = comment[match.end():match.end() + 800]
+        tail = comment[match.end() : match.end() + 800]
         lines = tail.splitlines()[:8]
         verdict = "UNK"
         for line in lines:

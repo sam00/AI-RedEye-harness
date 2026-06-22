@@ -45,17 +45,17 @@ log = logging.getLogger(__name__)
 
 _STAGE_ORDER: list[tuple[str, Callable[..., StageResult]]] = [
     ("s1_attack_surface", s1_attack_surface.run),
-    ("s1b_structural", s1b_structural.run),       # optional; deterministic, no LLM
+    ("s1b_structural", s1b_structural.run),  # optional; deterministic, no LLM
     ("s2_threat_model", s2_threat_model.run),
     ("s3_strategize", s3_strategize.run),
     ("s4_research", s4_research.run),
-    ("s4b_grounding", s4b_grounding.run),         # optional; deterministic, no LLM
+    ("s4b_grounding", s4b_grounding.run),  # optional; deterministic, no LLM
     ("s5_policy_gate", s5_policy_gate.run),
     ("s6_adversarial", s6_adversarial.run),
-    ("s6b_validator", s6b_validator.run),         # optional
+    ("s6b_validator", s6b_validator.run),  # optional
     ("s7_dedupe", s7_dedupe.run),
     ("s8_chain", s8_chain.run),
-    ("s8b_poc", s8b_poc.run),                     # optional; demands concrete PoC
+    ("s8b_poc", s8b_poc.run),  # optional; demands concrete PoC
     ("s9_emit", s9_emit.run),
 ]
 
@@ -181,16 +181,14 @@ class Orchestrator:
 
             if stage_id == "s4_research":
                 all_findings.extend(result.findings)
-                manifest.hallucination_metrics["raw_lens"] = (
-                    manifest.hallucination_metrics.get("raw_lens", 0) + len(result.findings)
-                )
+                manifest.hallucination_metrics["raw_lens"] = manifest.hallucination_metrics.get(
+                    "raw_lens", 0
+                ) + len(result.findings)
             elif stage_id == "s4b_grounding":
                 # Grounding either drops (strict mode) or just tags. In both
                 # cases ``result.findings`` is what survives.
                 report = result.artifacts.get("grounding_report", {}) or {}
-                manifest.hallucination_metrics.setdefault(
-                    "ungrounded_dropped", 0
-                )
+                manifest.hallucination_metrics.setdefault("ungrounded_dropped", 0)
                 manifest.hallucination_metrics["ungrounded_dropped"] += int(
                     report.get("dropped", 0)
                 )
@@ -218,10 +216,9 @@ class Orchestrator:
                 dropped.extend(vote_outcome.dropped)
                 result.artifacts["voting_kept"] = len(vote_outcome.kept)
                 result.artifacts["voting_dropped"] = len(vote_outcome.dropped)
-                manifest.hallucination_metrics["voted_out"] = (
-                    manifest.hallucination_metrics.get("voted_out", 0)
-                    + len(vote_outcome.dropped)
-                )
+                manifest.hallucination_metrics["voted_out"] = manifest.hallucination_metrics.get(
+                    "voted_out", 0
+                ) + len(vote_outcome.dropped)
             elif stage_id == "s6b_validator":
                 # Validator partitions: kept survives, rejected goes to the
                 # dropped pile so the report can show why each one died.
@@ -231,8 +228,7 @@ class Orchestrator:
                 dropped.extend(rejected_now)
                 all_findings = result.findings
                 manifest.hallucination_metrics["validator_rejected"] = (
-                    manifest.hallucination_metrics.get("validator_rejected", 0)
-                    + len(rejected_now)
+                    manifest.hallucination_metrics.get("validator_rejected", 0) + len(rejected_now)
                 )
             elif stage_id == "s7_dedupe":
                 all_findings = result.findings
@@ -241,16 +237,13 @@ class Orchestrator:
             elif stage_id == "s8b_poc":
                 all_findings = result.findings
                 metrics = result.artifacts.get("poc_metrics", {}) or {}
-                manifest.hallucination_metrics["missing_poc"] = (
-                    manifest.hallucination_metrics.get("missing_poc", 0)
-                    + int(metrics.get("no_poc_demoted", 0))
-                )
+                manifest.hallucination_metrics["missing_poc"] = manifest.hallucination_metrics.get(
+                    "missing_poc", 0
+                ) + int(metrics.get("no_poc_demoted", 0))
             elif stage_id == "s9_emit":
                 result.artifacts["finding_count"] = len(all_findings)
                 result.artifacts["dropped_count"] = len(dropped)
-                result.artifacts["_hallucination_metrics"] = dict(
-                    manifest.hallucination_metrics
-                )
+                result.artifacts["_hallucination_metrics"] = dict(manifest.hallucination_metrics)
 
         manifest.ended_at = datetime.now(timezone.utc)
         manifest.finding_count = len(all_findings)

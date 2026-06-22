@@ -106,7 +106,10 @@ class Evidence(BaseModel):
     get their severity capped at ``MEDIUM`` and tagged ``weak-evidence``.
     """
 
-    kind: str = Field(..., description="file_exists | line_resolves | snippet_match | structural_hit | poc_runnable | reachable")
+    kind: str = Field(
+        ...,
+        description="file_exists | line_resolves | snippet_match | structural_hit | poc_runnable | reachable",
+    )
     check: str = Field(..., description="pass | fail | unknown")
     detail: str = Field(default="", max_length=1000)
 

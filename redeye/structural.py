@@ -70,13 +70,21 @@ _SINK_PATTERNS: list[tuple[re.Pattern, str, str]] = [
     (re.compile(r"\.execute\s*\(\s*[a-zA-Z_]\w*\s*\)"), "sql_execute_var", "CWE-89"),
     (re.compile(r"raw_query|rawQuery|exec\s*\(\s*[a-zA-Z_]"), "sql_raw", "CWE-89"),
     # Command injection
-    (re.compile(r"subprocess\.(run|call|Popen|check_output)\s*\([^)]*shell\s*=\s*True"), "subprocess_shell_true", "CWE-78"),
+    (
+        re.compile(r"subprocess\.(run|call|Popen|check_output)\s*\([^)]*shell\s*=\s*True"),
+        "subprocess_shell_true",
+        "CWE-78",
+    ),
     (re.compile(r"os\.system\("), "os_system", "CWE-78"),
     (re.compile(r"\bexec\s*\("), "exec_call", "CWE-95"),
     (re.compile(r"\beval\s*\("), "eval_call", "CWE-95"),
     # Deserialization
     (re.compile(r"\bpickle\.(loads?|Unpickler)\b"), "pickle_load", "CWE-502"),
-    (re.compile(r"\byaml\.load\s*\(\s*[^,)]*\)"), "yaml_load_unsafe", "CWE-502"),  # safe_load uses 2 args usually
+    (
+        re.compile(r"\byaml\.load\s*\(\s*[^,)]*\)"),
+        "yaml_load_unsafe",
+        "CWE-502",
+    ),  # safe_load uses 2 args usually
     (re.compile(r"\bObjectInputStream\b"), "java_deser", "CWE-502"),
     # Crypto weakness
     (re.compile(r"\bhashlib\.md5\(|\bhashlib\.sha1\("), "weak_hash", "CWE-327"),
@@ -93,9 +101,17 @@ _SINK_PATTERNS: list[tuple[re.Pattern, str, str]] = [
     # required the first token to be an identifier.
     (re.compile(r"open\s*\(\s*['\"][^'\"]*['\"]\s*[+%]"), "open_strconcat", "CWE-22"),
     # Flask static file server with a variable path argument.
-    (re.compile(r"send_from_directory\s*\([^)]*,\s*[a-zA-Z_]\w*"), "path_send_from_directory", "CWE-22"),
+    (
+        re.compile(r"send_from_directory\s*\([^)]*,\s*[a-zA-Z_]\w*"),
+        "path_send_from_directory",
+        "CWE-22",
+    ),
     # SSRF
-    (re.compile(r"requests\.(get|post|put|delete)\s*\(\s*[a-zA-Z_]\w*\s*[+%]"), "ssrf_http", "CWE-918"),
+    (
+        re.compile(r"requests\.(get|post|put|delete)\s*\(\s*[a-zA-Z_]\w*\s*[+%]"),
+        "ssrf_http",
+        "CWE-918",
+    ),
     (re.compile(r"urllib\.request\.urlopen\s*\(\s*[a-zA-Z_]\w*\s*[+%]"), "ssrf_urlopen", "CWE-918"),
     # JWT / auth
     (re.compile(r"jwt\.decode\s*\([^)]*verify\s*=\s*False"), "jwt_verify_off", "CWE-347"),
@@ -111,12 +127,22 @@ _SECRET_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"), "slack_token"),
     (re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"), "private_key"),
     # Generic high-entropy patterns -- noisier; LLM dedups
-    (re.compile(r"(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][A-Za-z0-9_+/=-]{16,}['\"]"), "generic_secret_assignment"),
+    (
+        re.compile(
+            r"(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][A-Za-z0-9_+/=-]{16,}['\"]"
+        ),
+        "generic_secret_assignment",
+    ),
     # Short hardcoded credential literals (e.g. ``DB_PASSWORD = "test"``). The
     # generic pattern above requires >=16 chars and so silently missed every
     # short test/dev password -- exactly the class that is most often real.
     # No leading \b so it also fires inside names like DB_PASSWORD.
-    (re.compile(r"(?i)(password|passwd|pwd|secret|token|api[_-]?key)\s*=\s*['\"]([^'\"]{2,40})['\"]"), "hardcoded_credential"),
+    (
+        re.compile(
+            r"(?i)(password|passwd|pwd|secret|token|api[_-]?key)\s*=\s*['\"]([^'\"]{2,40})['\"]"
+        ),
+        "hardcoded_credential",
+    ),
 ]
 
 
@@ -190,7 +216,11 @@ def build_index(*, target: Path, file_paths: list[Path]) -> StructuralIndex:
         except OSError as exc:
             log.debug("structural: could not read %s: %s", file_path, exc)
             continue
-        rel = str(file_path.relative_to(target)) if file_path.is_relative_to(target) else str(file_path)
+        rel = (
+            str(file_path.relative_to(target))
+            if file_path.is_relative_to(target)
+            else str(file_path)
+        )
 
         for line_no, line in enumerate(text.splitlines(), start=1):
             # routes
@@ -199,26 +229,35 @@ def build_index(*, target: Path, file_paths: list[Path]) -> StructuralIndex:
                 if m:
                     # The route value is in the *last* capture group across our patterns.
                     route = m.group(m.lastindex) if m.lastindex else m.group(0)
-                    idx.routes.append(
-                        StructuralHit(rel, line_no, "route", lang, route[:200])
-                    )
+                    idx.routes.append(StructuralHit(rel, line_no, "route", lang, route[:200]))
             # sources
             for pat, kind in _SOURCE_PATTERNS:
                 if pat.search(line):
                     idx.sources.append(
-                        StructuralHit(rel, line_no, kind, "source", _short_snippet(text, line_no - 1))
+                        StructuralHit(
+                            rel, line_no, kind, "source", _short_snippet(text, line_no - 1)
+                        )
                     )
             # sinks
             for pat, kind, cwe in _SINK_PATTERNS:
                 if pat.search(line):
                     idx.sinks.append(
-                        StructuralHit(rel, line_no, kind, "sink", _short_snippet(text, line_no - 1), cwe_hint=cwe)
+                        StructuralHit(
+                            rel,
+                            line_no,
+                            kind,
+                            "sink",
+                            _short_snippet(text, line_no - 1),
+                            cwe_hint=cwe,
+                        )
                     )
             # secrets
             for pat, kind in _SECRET_PATTERNS:
                 if pat.search(line):
                     idx.secrets.append(
-                        StructuralHit(rel, line_no, kind, "secret", _short_snippet(text, line_no - 1))
+                        StructuralHit(
+                            rel, line_no, kind, "secret", _short_snippet(text, line_no - 1)
+                        )
                     )
         idx.files_indexed += 1
     return idx
@@ -319,7 +358,8 @@ def derive_deterministic_findings(
         n += 1
         sev = Severity.HIGH
         emit(
-            "CWE-89", sev,
+            "CWE-89",
+            sev,
             f"SQL injection: untrusted input reaches '{h.kind}' sink",
             h,
             "HTTP request value / current_user.username (attacker-influenced)",
@@ -350,7 +390,8 @@ def derive_deterministic_findings(
         n += 1
         sev = Severity.HIGH if has_request(h.path) else Severity.MEDIUM
         emit(
-            "CWE-22", sev,
+            "CWE-22",
+            sev,
             f"Path traversal: user-controlled path reaches '{h.kind}'",
             h,
             "user-controlled filename / path segment",
@@ -379,7 +420,8 @@ def derive_deterministic_findings(
             break
         n += 1
         emit(
-            "CWE-798", Severity.HIGH,
+            "CWE-798",
+            Severity.HIGH,
             f"Hardcoded credential in source ('{h.kind}')",
             h,
             None,

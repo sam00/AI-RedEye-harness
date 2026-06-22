@@ -35,7 +35,9 @@ class VertexBackend(BackendBase):
             and (
                 os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
                 or os.environ.get("GOOGLE_TOKEN")
-                or os.path.exists(os.path.expanduser("~/.config/gcloud/application_default_credentials.json"))
+                or os.path.exists(
+                    os.path.expanduser("~/.config/gcloud/application_default_credentials.json")
+                )
             )
         )
 
@@ -78,7 +80,11 @@ class VertexBackend(BackendBase):
     ) -> CompletionResult:
         if not self._ensure_init():
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
         try:
             from vertexai.generative_models import (  # type: ignore[import-not-found]
@@ -87,7 +93,11 @@ class VertexBackend(BackendBase):
             )
         except ImportError:
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
 
         try:
@@ -95,11 +105,17 @@ class VertexBackend(BackendBase):
             cfg_kwargs: dict[str, Any] = {"max_output_tokens": max_tokens}
             if temperature is not None:
                 cfg_kwargs["temperature"] = temperature
-            resp = gen_model.generate_content(user, generation_config=GenerationConfig(**cfg_kwargs))
+            resp = gen_model.generate_content(
+                user, generation_config=GenerationConfig(**cfg_kwargs)
+            )
         except Exception as exc:  # noqa: BLE001
             log.warning("Vertex generate_content failed (%s) -- falling back to mock.", exc)
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
 
         text = getattr(resp, "text", "") or ""
@@ -110,5 +126,10 @@ class VertexBackend(BackendBase):
         out_price = _PRICE_PER_MTOK_OUT.get(model, 5.0) / 1_000_000
         cost = tokens_in * in_price + tokens_out * out_price
         return CompletionResult(
-            text=text, tokens_in=tokens_in, tokens_out=tokens_out, cost_usd=cost, model=model, raw=resp
+            text=text,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            cost_usd=cost,
+            model=model,
+            raw=resp,
         )

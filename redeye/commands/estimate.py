@@ -92,7 +92,9 @@ def run(*, console: Console, repo: Path, profile: str | None) -> None:
     console.rule(f"[bold]redeye estimate[/bold] — {repo}")
 
     files, total, langs = _enumerate(repo)
-    console.print(f"Files scanned: [cyan]{files:,}[/cyan]   Total: [cyan]{total / 1e6:,.1f} MB[/cyan]")
+    console.print(
+        f"Files scanned: [cyan]{files:,}[/cyan]   Total: [cyan]{total / 1e6:,.1f} MB[/cyan]"
+    )
 
     if langs:
         lang_table = Table(title="Language mix")
@@ -113,7 +115,9 @@ def run(*, console: Console, repo: Path, profile: str | None) -> None:
         cost_table.add_row(stage_id, stage.skill, f"${stage.max_budget_usd:.2f}")
         grand_total += stage.max_budget_usd
     console.print(cost_table)
-    console.print(f"\n[bold]Worst-case total:[/bold] ${grand_total:.2f} (caps are per-stage, not global)")
+    console.print(
+        f"\n[bold]Worst-case total:[/bold] ${grand_total:.2f} (caps are per-stage, not global)"
+    )
     console.print(
         "[dim]This is an upper bound. Actual spend is usually 30–60% lower because most "
         "stages exit early once findings stabilise.[/dim]"

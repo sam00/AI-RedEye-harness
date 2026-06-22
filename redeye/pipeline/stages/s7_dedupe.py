@@ -48,7 +48,9 @@ def _merge(into: Finding, frm: Finding) -> Finding:
     into.tags = sorted(set(into.tags + frm.tags + [f"merged_with:{frm.id}"]))
     extra = frm.description.strip()
     if extra and extra not in into.description:
-        into.description = f"{into.description}\n\n— also reported by {frm.skill or 'lens'}: {extra}"
+        into.description = (
+            f"{into.description}\n\n— also reported by {frm.skill or 'lens'}: {extra}"
+        )
     into.revision += 1
     return into
 

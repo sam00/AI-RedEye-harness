@@ -98,7 +98,11 @@ class BedrockBackend(BackendBase):
         client = self._get_client()
         if client is None:
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
 
         # Bedrock's Anthropic invocation uses the messages API shape.
@@ -121,7 +125,11 @@ class BedrockBackend(BackendBase):
         except Exception as exc:  # noqa: BLE001
             log.warning("Bedrock invoke_model failed (%s) -- falling back to mock.", exc)
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
 
         try:
@@ -129,7 +137,11 @@ class BedrockBackend(BackendBase):
         except Exception as exc:  # noqa: BLE001
             log.warning("Bedrock response parse failed (%s) -- falling back to mock.", exc)
             return MockBackend({}).complete(
-                system=system, user=user, model=model, max_tokens=max_tokens, temperature=temperature
+                system=system,
+                user=user,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
 
         text_parts: list[str] = []
@@ -145,5 +157,10 @@ class BedrockBackend(BackendBase):
         out_price = _PRICE_PER_MTOK_OUT.get(model, 15.0) / 1_000_000
         cost = tokens_in * in_price + tokens_out * out_price
         return CompletionResult(
-            text=text, tokens_in=tokens_in, tokens_out=tokens_out, cost_usd=cost, model=model, raw=payload
+            text=text,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            cost_usd=cost,
+            model=model,
+            raw=payload,
         )

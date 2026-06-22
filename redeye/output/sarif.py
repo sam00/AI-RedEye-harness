@@ -181,9 +181,7 @@ def build_sarif_log(*, target: Path, findings: list[Finding]) -> dict:
                         "rules": list(rules.values()),
                     }
                 },
-                "originalUriBaseIds": {
-                    "%SRCROOT%": {"uri": str(target.as_uri())}
-                },
+                "originalUriBaseIds": {"%SRCROOT%": {"uri": str(target.as_uri())}},
                 "results": results,
             }
         ],

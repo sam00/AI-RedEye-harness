@@ -41,7 +41,17 @@ PRESETS: dict[str, dict[str, Any]] = {
         "max_files": 300,
         "max_file_bytes": 1_000_000,
         "max_total_bytes": 20_971_520,  # 20 MB
-        "exclude_paths": ["test", "tests", "vendor", "node_modules", "__tests__", "dist", "build", ".next", "coverage"],
+        "exclude_paths": [
+            "test",
+            "tests",
+            "vendor",
+            "node_modules",
+            "__tests__",
+            "dist",
+            "build",
+            ".next",
+            "coverage",
+        ],
         "strict_grounding": True,
         "store_findings": True,
     },

@@ -77,9 +77,7 @@ def _detect() -> list[Detection]:
             backend="sdk",
             detected=has_sdk,
             note=(
-                "ANTHROPIC_SDK_API_KEY set"
-                if has_sdk
-                else "set ANTHROPIC_SDK_API_KEY=sk-ant-..."
+                "ANTHROPIC_SDK_API_KEY set" if has_sdk else "set ANTHROPIC_SDK_API_KEY=sk-ant-..."
             ),
             sample_env=[
                 "# Backend: sdk (Anthropic SDK)",
@@ -349,9 +347,7 @@ def run(
             config_path.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
             console.print(f"[green]wrote[/green] {config_path}")
         elif config_path.exists():
-            console.print(
-                f"[yellow]{config_path}[/yellow] already exists -- not overwriting."
-            )
+            console.print(f"[yellow]{config_path}[/yellow] already exists -- not overwriting.")
 
     # 5. Next steps.
     console.print(
