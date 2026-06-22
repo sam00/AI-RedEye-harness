@@ -1,0 +1,153 @@
+name: redeye
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Profile (default | cli | full | mock | <path>)"
+        required: false
+        default: "full"
+      target:
+        description: "Path inside the repo to scan (defaults to repo root)"
+        required: false
+        default: "."
+  issue_comment:
+    types: [edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  pr-scan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for git diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install redeye
+        run: |
+          pip install --upgrade pip
+          pip install .
+
+      - name: Doctor
+        env:
+          REDEYE_PROFILE: ${{ vars.REDEYE_PROFILE || 'mock' }}
+        run: redeye doctor --no-network
+
+      - name: PR scan (diff-only)
+        env:
+          REDEYE_PROFILE: ${{ vars.REDEYE_PROFILE || 'mock' }}
+          # Optional backends: set the corresponding repo secrets.
+          ANTHROPIC_SDK_API_KEY: ${{ secrets.ANTHROPIC_SDK_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+          REDEYE_DB_PATH: ${{ runner.temp }}/scans.db
+          REDEYE_WEBHOOK_URL: ${{ secrets.REDEYE_WEBHOOK_URL }}
+          REDEYE_WEBHOOK_TYPE: ${{ vars.REDEYE_WEBHOOK_TYPE || 'slack' }}
+        run: |
+          if [ -n "${{ secrets.GOOGLE_CREDENTIALS }}" ]; then
+            echo '${{ secrets.GOOGLE_CREDENTIALS }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+          fi
+          mkdir -p out
+          redeye scan \
+            --repo . \
+            --diff-only \
+            --pr-base "origin/${{ github.event.pull_request.base.ref }}" \
+            --max-files 100 \
+            --max-file-bytes 500000 \
+            --max-total-bytes 5242880 \
+            --exclude-path test --exclude-path vendor --exclude-path node_modules \
+            --output-dir ./out \
+            --pr-comment ./out/pr-comment.md \
+            --store-findings \
+            --use-feedback \
+            ${REDEYE_WEBHOOK_URL:+--webhook-url "$REDEYE_WEBHOOK_URL" --webhook-type "$REDEYE_WEBHOOK_TYPE"}
+
+      - name: Post PR comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f ./out/pr-comment.md ]; then
+            gh pr comment "${{ github.event.pull_request.number }}" --body-file ./out/pr-comment.md
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redteam-scan-pr-${{ github.event.pull_request.number }}
+          path: out/
+
+  full-scan:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install .
+      - run: redeye doctor --no-network
+      - name: Full scan
+        env:
+          ANTHROPIC_SDK_API_KEY: ${{ secrets.ANTHROPIC_SDK_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          REDEYE_WEBHOOK_URL: ${{ secrets.REDEYE_WEBHOOK_URL }}
+          REDEYE_WEBHOOK_TYPE: ${{ vars.REDEYE_WEBHOOK_TYPE || 'slack' }}
+        run: |
+          redeye scan \
+            --repo "${{ github.event.inputs.target || '.' }}" \
+            --profile "${{ github.event.inputs.profile || 'full' }}" \
+            --output-dir ./out \
+            --store-findings \
+            ${REDEYE_WEBHOOK_URL:+--webhook-url "$REDEYE_WEBHOOK_URL" --webhook-type "$REDEYE_WEBHOOK_TYPE"}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: redteam-full-scan-${{ github.run_id }}
+          path: out/
+
+  collect-feedback:
+    # Triggered when a reviewer ticks a TP/FP box in a PR comment.
+    if: github.event_name == 'issue_comment' && github.event.action == 'edited' && github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install .
+      - name: Persist verdicts
+        env:
+          REDEYE_DB_PATH: ${{ runner.temp }}/scans.db
+        shell: bash
+        run: |
+          cat > /tmp/comment.md <<'EOF'
+          ${{ github.event.comment.body }}
+          EOF
+          redeye collect-feedback --comment-file /tmp/comment.md

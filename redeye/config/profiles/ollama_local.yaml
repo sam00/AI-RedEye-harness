@@ -1,0 +1,54 @@
+# Local Ollama profile -- single-shot, no tool-loops.
+# Used when cloud LLM budget is exhausted; every role runs against a local
+# Ollama server (qwen2.5-coder). Deterministic v0.3 layers (S1b, S4b, S8b)
+# do the heavy precision lifting; the LLM stages get the S1b structural
+# inventory packed into their prompts so no filesystem tool-loop is needed.
+
+name: ollama_local
+
+roles:
+  surveyor:
+    via: ollama
+    model: qwen2.5-coder:7b
+    max_tokens: 3072
+  researcher:
+    via: ollama
+    model: qwen2.5-coder:7b
+    max_tokens: 4096
+  adversary:
+    via: ollama
+    model: qwen2.5-coder:7b
+    max_tokens: 4096
+  reporter:
+    via: ollama
+    model: qwen2.5-coder:7b
+    max_tokens: 3072
+  validator:
+    via: ollama
+    model: qwen2.5-coder:7b
+    max_tokens: 1024
+
+stages:
+  s1_attack_surface: {skill: attack_surface_mapper, role: surveyor, max_budget_usd: 5.0}
+  s1b_structural:    {skill: structural_index, role: surveyor, max_budget_usd: 0.0}
+  s2_threat_model:   {skill: threat_modeler, role: surveyor, max_budget_usd: 5.0}
+  s3_strategize:     {skill: research_strategist, role: researcher, max_budget_usd: 5.0}
+  s4_research:
+    skill: research_lenses
+    role: researcher
+    max_budget_usd: 20.0
+    params:
+      lenses: [language, crypto, logic, access_control, iac]
+  s4b_grounding:     {skill: grounding_pass, role: surveyor, max_budget_usd: 0.0, params: {strict: false}}
+  s5_policy_gate:    {skill: policy_gate, role: surveyor, max_budget_usd: 5.0}
+  s6_adversarial:    {skill: adversarial_reviewer, role: adversary, max_budget_usd: 10.0}
+  s6b_validator:     {skill: validator, role: validator, max_budget_usd: 5.0}
+  s7_dedupe:         {skill: dedupe, role: reporter, max_budget_usd: 5.0}
+  s8_chain:          {skill: exploit_strategist, role: reporter, max_budget_usd: 5.0}
+  s8b_poc:           {skill: poc_gate, role: validator, max_budget_usd: 5.0, params: {strict: false}}
+  s9_emit:           {skill: emit, role: reporter, max_budget_usd: 0.0}
+
+voting:
+  enabled: false
+  quorum: 1
+  voters: [researcher]
