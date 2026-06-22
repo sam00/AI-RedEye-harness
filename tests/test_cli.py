@@ -54,3 +54,51 @@ def test_scan_runs(tiny_repo: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
+
+
+def test_scan_with_preset_quick_runs_against_mock(tiny_repo: Path, monkeypatch) -> None:
+    """`redeye scan --preset quick` should produce a working scan with
+    profile=mock baked in. No --profile flag needed.
+    """
+    # Point the SQLite store inside tmp so the test stays hermetic.
+    monkeypatch.setenv("REDEYE_DB_PATH", str(tiny_repo / "scans.db"))
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "scan",
+            "--repo",
+            str(tiny_repo),
+            "--preset",
+            "quick",
+            "--output-dir",
+            str(tiny_repo / "out"),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    # The preset banner should print so operators see what was applied.
+    assert "applied preset" in result.output
+    assert "quick" in result.output
+
+
+def test_scan_explicit_flag_overrides_preset(tiny_repo: Path, monkeypatch) -> None:
+    """User-supplied --max-files must beat the preset's value."""
+    monkeypatch.setenv("REDEYE_DB_PATH", str(tiny_repo / "scans.db"))
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "scan",
+            "--repo",
+            str(tiny_repo),
+            "--preset",
+            "quick",
+            "--max-files",
+            "7",
+            "--output-dir",
+            str(tiny_repo / "out"),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    # Banner shows that max_files was preserved as explicit.
+    assert "max_files" in result.output

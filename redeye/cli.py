@@ -185,6 +185,19 @@ def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
     ),
 )
 @click.option(
+    "--preset",
+    type=click.Choice(["pr", "ci", "deep", "quick"]),
+    default=None,
+    help=(
+        "One-flag substitute for common scan-flag combos. "
+        "'pr' = diff-only PR scan with strict grounding + DoS limits + standard exclusions. "
+        "'ci' = bounded full-repo CI scan. "
+        "'deep' = research mode (unlimited scope, keep weak-evidence findings). "
+        "'quick' = 60-second mock-backend demo with zero LLM cost. "
+        "Explicit CLI flags ALWAYS override the preset's values."
+    ),
+)
+@click.option(
     "--pr-comment",
     type=click.Path(file_okay=True, dir_okay=False),
     default=None,
@@ -228,9 +241,56 @@ def scan(
     webhook_type: str,
     strict_grounding: bool,
     require_poc: bool,
+    preset: str | None,
 ) -> None:
     """Run the full 9-stage pipeline against one or more repositories."""
     from redeye.commands.scan import run as run_scan
+
+    # --- Preset overlay: fill in any flag the user didn't explicitly pass ---
+    # Click's get_parameter_source() lets us distinguish "user typed this" from
+    # "default value". Explicit flags always win over the preset.
+    if preset is not None:
+        from redeye.commands.presets import apply_preset
+
+        # Build a snapshot of the current locals + the set of flags the user
+        # actually typed.
+        local_flags = {
+            "profile": profile,
+            "diff_only": diff_only,
+            "pr_base": pr_base,
+            "exclude_paths": list(exclude_paths),
+            "max_files": max_files,
+            "max_file_bytes": max_file_bytes,
+            "max_total_bytes": max_total_bytes,
+            "strict_grounding": strict_grounding,
+            "require_poc": require_poc,
+            "store_findings": store_findings,
+            "use_feedback": use_feedback,
+        }
+        explicit = {
+            name
+            for name in local_flags
+            if ctx.get_parameter_source(name)
+            == click.core.ParameterSource.COMMANDLINE
+        }
+        merged = apply_preset(preset, explicit_flags=explicit, current_kwargs=local_flags)
+
+        # Rebind locals from the merged values (only the keys we manage).
+        profile = merged["profile"]
+        diff_only = merged["diff_only"]
+        pr_base = merged["pr_base"]
+        exclude_paths = tuple(merged["exclude_paths"])  # CLI args are tuples
+        max_files = merged["max_files"]
+        max_file_bytes = merged["max_file_bytes"]
+        max_total_bytes = merged["max_total_bytes"]
+        strict_grounding = merged["strict_grounding"]
+        require_poc = merged["require_poc"]
+        store_findings = merged["store_findings"]
+        use_feedback = merged["use_feedback"]
+        console.print(
+            f"[dim]applied preset [bold]{preset}[/bold] "
+            f"(explicit flags preserved: {sorted(explicit) or 'none'})[/dim]"
+        )
 
     if not repo and not repo_file:
         raise click.UsageError("Either --repo or --repo-file is required.")
@@ -266,6 +326,37 @@ def scan(
     except AgenticSecError as exc:
         console.print(f"[red]scan failed:[/red] {exc}")
         sys.exit(2)
+
+
+@main.command("init")
+@click.option(
+    "--non-interactive",
+    is_flag=True,
+    help="Accept all recommended defaults without prompting. Useful for CI bootstrap.",
+)
+@click.option(
+    "--write-config",
+    is_flag=True,
+    help="Also write ./config.yaml seeded from the chosen profile.",
+)
+@click.option(
+    "--env-path",
+    type=click.Path(dir_okay=False),
+    default=None,
+    help="Where to write the rendered .env (default: ./.env).",
+)
+@click.pass_context
+def init(ctx: click.Context, non_interactive: bool, write_config: bool, env_path: str | None) -> None:
+    """Interactive setup wizard -- detect creds, pick a profile, write .env."""
+    from redeye.commands.init import run as run_init
+
+    rc = run_init(
+        console=ctx.obj["console"],
+        output_env=Path(env_path) if env_path else None,
+        write_config=write_config,
+        non_interactive=non_interactive,
+    )
+    sys.exit(rc)
 
 
 @main.command("collect-feedback")

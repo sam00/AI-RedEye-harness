@@ -20,6 +20,52 @@ Multi-cloud LLM by design: Anthropic (CLI / SDK), OpenAI / OpenAI-compatible, **
 
 ---
 
+## Quickstart (60 seconds, zero LLM cost)
+
+```bash
+git clone https://github.com/sam00/AI-Redteam.git redeye
+cd redeye
+make install           # python3 -m venv + pip install -e ".[dev]"
+make demo              # mock-backend scan against ./, writes ./out/*.md + .sarif
+```
+
+That's it -- you have a working install and a complete sample report in
+`./out/`. The mock backend is deterministic, needs no API keys, and exercises
+all 13 pipeline stages.
+
+When you're ready to run with a real LLM:
+
+```bash
+make init              # interactive wizard: detects creds, writes .env, recommends profile
+make scan-pr           # diff-only PR scan with strict grounding
+make scan-ci           # bounded full-repo CI scan
+make scan-deep         # research mode (no DoS limits, keep weakly-grounded triage candidates)
+```
+
+Or use the CLI directly with the same shortcuts:
+
+```bash
+redeye init                                # interactive setup
+redeye scan --repo . --preset pr           # PR scan
+redeye scan --repo . --preset ci           # CI scan
+redeye scan --repo . --preset deep         # deep research
+redeye scan --repo . --preset quick        # mock demo
+```
+
+Each `--preset` is just a default-overlay for the standard scan flags --
+**any explicit flag you pass on the command line still wins**. So
+`redeye scan --preset pr --max-files 200` keeps the PR-preset's strict
+grounding and exclusions but bumps the file cap to 200.
+
+| Preset | Backend | Scope | Grounding | Use when |
+|---|---|---|---|---|
+| `quick` | mock (no LLM cost) | small | lenient | trying the tool, CI smoke tests |
+| `pr` | active profile | files changed vs `origin/main` | strict | every PR (mirrors the bundled GHA workflow) |
+| `ci` | active profile | whole repo, DoS-capped | strict | nightly cron / `workflow_dispatch` |
+| `deep` | active profile | unlimited | lenient (keeps weak-evidence) | research deep-dive |
+
+---
+
 ## What's new in 0.3 -- the hallucination-reduction layer
 
 Six new filters in front of the report, designed so a finding can't reach
