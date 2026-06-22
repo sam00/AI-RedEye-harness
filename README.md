@@ -23,7 +23,7 @@ Multi-cloud LLM by design: Anthropic (CLI / SDK), OpenAI / OpenAI-compatible, **
 ## Quickstart (60 seconds, zero LLM cost)
 
 ```bash
-git clone https://github.com/sam00/AI-Redteam.git redeye
+git clone https://github.com/sam00/AI-RedEye-harness.git redeye
 cd redeye
 make install           # python3 -m venv + pip install -e ".[dev]"
 make demo              # mock-backend scan against ./, writes ./out/*.md + .sarif

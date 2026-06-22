@@ -85,5 +85,5 @@ The same harness can route stages through any of:
 - PR-comment Markdown (with TP/FP checkboxes)
 - GitHub Actions workflow for PR scan + full scan + feedback collection
 
-[Unreleased]: https://github.com/sam00/AI-Redteam/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/sam00/AI-Redteam/releases/tag/v0.3.0
+[Unreleased]: https://github.com/sam00/AI-RedEye-harness/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sam00/AI-RedEye-harness/releases/tag/v0.3.0
