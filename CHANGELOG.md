@@ -63,7 +63,7 @@ Renamed from `agenticsec-harness` to `redeye`. The package is
 `redeye`; the CLI is `redeye` (with short alias `redeye`).
 Pipeline architecture and existing API are unchanged for the core 9 stages.
 
-### Added (operational layer borrowed from rivian/ai-sast)
+### Added (operational layer)
 
 - **PR-scan mode** -- `--diff-only` / `--pr-base` scopes the scan to files
   changed against a base branch (uses `git diff --name-only`).

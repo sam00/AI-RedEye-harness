@@ -1,9 +1,9 @@
 """Single-pass validator skill (S6.5).
 
-Pattern from ai-sast: a *separate* model runs one pass over each finding
-and marks it true-positive / false-positive / uncertain. Findings marked
-false-positive are dropped (preserved in the dropped-findings appendix);
-findings marked uncertain pass through but get a tag.
+A *separate* model runs one pass over each finding and marks it
+true-positive / false-positive / uncertain. Findings marked false-positive
+are dropped (preserved in the dropped-findings appendix); findings marked
+uncertain pass through but get a tag.
 
 This is conceptually different from S6 multi-agent voting:
 

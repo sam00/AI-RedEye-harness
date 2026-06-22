@@ -36,8 +36,8 @@ accidentally-massive PR could otherwise nuke your token budget.
 | `--max-file-bytes` | 0 (unlimited) | Skip individual files larger than this. |
 | `--max-total-bytes` | 0 (unlimited) | Stop scanning once cumulative bytes exceeds. |
 
-The PR-scan defaults baked into the GHA workflow are **100 / 500 KB / 5 MB**,
-matching ai-sast's defaults.
+The PR-scan defaults baked into the GHA workflow are **100 / 500 KB / 5 MB**.
+These keep the cost ceiling on every PR comfortably small.
 
 ## PR comment writer
 
@@ -88,9 +88,9 @@ The store is local-first SQLite at `~/.redteam-harness/scans.db` (override
 with `REDEYE_DB_PATH`). It has two tables, `scans` and `findings`, both
 keyed on a deterministic `scan_id = "<target_sha>--<started_at>"`.
 
-The Databricks backend (in ai-sast) is on the roadmap; the same shape
-will plug into a `DatabricksStore` class that satisfies the same
-interface as `FindingsStore`.
+A Databricks backend is on the roadmap; it will plug into a
+`DatabricksStore` class that satisfies the same interface as
+`FindingsStore`.
 
 ## Webhook notifications
 

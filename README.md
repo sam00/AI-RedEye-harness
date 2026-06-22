@@ -16,8 +16,6 @@ Multi-cloud LLM by design: Anthropic (CLI / SDK), OpenAI / OpenAI-compatible, **
 
 > **Authorized use only.** Run scans only against code you own or have explicit permission to test. Findings are LLM-generated triage candidates that require human review — see [Limitations](#limitations).
 
-> **Architectural inspiration:** This project's pipeline structure follows public designs described in Anthropic's *Project Glasswing* materials, Visa's open-source [VVAH](https://github.com/visa/visa-vulnerability-agentic-harness), and Rivian's open-source [ai-sast](https://github.com/rivian/ai-sast). No code from those projects is bundled here. See [`NOTICE`](NOTICE).
-
 **Docs:** [`SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) · [`USER_GUIDE.md`](docs/USER_GUIDE.md) · [`architecture.md`](docs/architecture.md) · [`SKILLS.md`](docs/SKILLS.md) · [`configuration.md`](docs/configuration.md).
 
 ---
@@ -68,7 +66,7 @@ redeye scan --repo .  --require-poc              # drop findings without a runna
 
 ## What's new in 0.2 (vs 0.1 / `agenticsec-harness`)
 
-Borrowed from `ai-sast`:
+Operational layer (CI/CD + feedback):
 
 - **PR-scan mode** — `--diff-only --pr-base origin/main` only scans files changed in a PR.
 - **DoS limits** — `--max-files`, `--max-file-bytes`, `--max-total-bytes`.
@@ -83,7 +81,7 @@ Borrowed from `ai-sast`:
 - **CVSS** — every finding can carry a `cvss_vector` and `cvss_score`; SARIF emits both, plus `security-severity` for GitHub Code Scanning.
 - **New backends** — `bedrock` (AWS Claude), `vertex` (Gemini), `ollama` (local).
 
-Kept from VVAH (and the 0.1 base):
+Agentic pipeline (from the 0.1 / 0.2 base):
 
 - 3 phases / 9 stages (now 10 with optional validator).
 - Multi-agent voting for FP suppression at S6.

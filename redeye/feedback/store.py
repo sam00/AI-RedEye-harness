@@ -1,6 +1,6 @@
 """SQLite-backed findings store + feedback loop.
 
-This is the local-first equivalent of ai-sast's feedback database.
+A small local-first store for scan findings and reviewer TP/FP marks.
 
 Two tables:
 
