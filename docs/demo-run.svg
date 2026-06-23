@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="771" height="404" viewBox="0 0 771 404" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" role="img" aria-label="redeye scan (mock demo)">
+<rect width="771" height="404" rx="10" fill="#0d1117" stroke="#30363d"/>
+<rect width="771" height="38" rx="10" fill="#161b22"/>
+<rect y="20" width="771" height="18" fill="#161b22"/>
+<circle cx="20" cy="19" r="6" fill="#ff5f56"/><circle cx="42" cy="19" r="6" fill="#ffbd2e"/><circle cx="64" cy="19" r="6" fill="#27c93f"/>
+<text x="385" y="24" text-anchor="middle" fill="#8b949e" font-size="12.5">redeye scan (mock demo)</text>
+<text x="20" y="52" xml:space="preserve" fill="#e6edf3" font-size="14.5">$ redeye scan --repo ./app --preset quick      # profile: mock - 0 LLM cost</text>
+<text x="20" y="73" xml:space="preserve" fill="#c9d1d9" font-size="14.5"></text>
+<text x="20" y="94" xml:space="preserve" fill="#c9d1d9" font-size="14.5">(1/1) ./app</text>
+<text x="20" y="115" xml:space="preserve" fill="#58a6ff" font-size="14.5">  &gt; s1_attack_surface   &gt; s4_research     &gt; s6b_validator   &gt; s8_chain</text>
+<text x="20" y="136" xml:space="preserve" fill="#58a6ff" font-size="14.5">  &gt; s1b_structural      &gt; s4b_grounding   &gt; s7_dedupe       &gt; s8b_poc</text>
+<text x="20" y="157" xml:space="preserve" fill="#58a6ff" font-size="14.5">  &gt; s2_threat_model     &gt; s5_policy_gate  &gt; s9_emit</text>
+<text x="20" y="178" xml:space="preserve" fill="#58a6ff" font-size="14.5">  &gt; s3_strategize       &gt; s6_adversarial</text>
+<text x="20" y="199" xml:space="preserve" fill="#3fb950" font-size="14.5">  ok done in 0.0s | findings=0 dropped=4 cost=$0.000</text>
+<text x="20" y="220" xml:space="preserve" fill="#c9d1d9" font-size="14.5"></text>
+<text x="20" y="241" xml:space="preserve" fill="#8b949e" font-size="14.5"># quality metrics (from the generated report.md)</text>
+<text x="20" y="262" xml:space="preserve" fill="#d29922" font-size="14.5">  raw lens findings ............ 4</text>
+<text x="20" y="283" xml:space="preserve" fill="#d29922" font-size="14.5">  rejected by validator (S6.5) . 4</text>
+<text x="20" y="304" xml:space="preserve" fill="#3fb950" font-size="14.5">  findings delivered ........... 0</text>
+<text x="20" y="325" xml:space="preserve" fill="#3fb950" font-size="14.5">  -&gt; zero false positives reached the report</text>
+<text x="20" y="346" xml:space="preserve" fill="#c9d1d9" font-size="14.5"></text>
+<text x="20" y="367" xml:space="preserve" fill="#3fb950" font-size="14.5">wrote *_report.md + *_report.sarif   (SARIF 2.1.0, Code Scanning ready)</text>
+</svg>

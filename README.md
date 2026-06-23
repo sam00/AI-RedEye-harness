@@ -20,6 +20,60 @@ Multi-cloud LLM by design: Anthropic (CLI / SDK), OpenAI / OpenAI-compatible, **
 
 ---
 
+## Why use this?
+
+**The problem it solves.** AI-generated SAST is noisy — models invent file
+paths, hallucinate sinks, and bury reviewers in false positives. RedEye puts
+six deterministic checks (structural pre-index, taint schema, grounding pass,
+validator auto-reject, PoC gate, multi-agent voting) *in front of* every
+finding, so what reaches you cites real code and survived every cheap check the
+harness can run.
+
+**60-second quickstart.** No API keys, deterministic mock backend — full steps
+in [Quickstart](#quickstart-60-seconds-zero-llm-cost) just below:
+```bash
+git clone https://github.com/sam00/AI-RedEye-harness.git redeye && cd redeye
+make install && make demo      # writes ./out/*.md + *.sarif, zero LLM cost
+```
+
+**Example output.** Findings emit Markdown **and** SARIF 2.1.0 with
+`security-severity` and taint `codeFlows`, so they render natively in GitHub
+Code Scanning:
+
+![redeye scan — deterministic mock demo: 4 candidate findings, all filtered by the validator, 0 false positives delivered](docs/demo-run.svg)
+
+```jsonc
+// excerpt of *_report.sarif (GitHub renders this inline on the PR + Security tab)
+{
+  "ruleId": "redeye/sql-injection",
+  "level": "error",
+  "message": { "text": "Unsanitized request param flows into a SQL string." },
+  "properties": { "security-severity": "8.8" },
+  "locations": [{ "physicalLocation": {
+    "artifactLocation": { "uri": "app/users.py" },
+    "region": { "startLine": 42, "endLine": 42 }
+  }}],
+  "codeFlows": [ /* source -> sink taint path, shown as an inline trace */ ]
+}
+```
+
+<!--
+  High-conversion visual: capture the SARIF results in your repo's
+  GitHub "Security -> Code scanning" tab, save it as docs/sarif-code-scanning.png,
+  then uncomment the line below.
+![RedEye findings in the GitHub Code Scanning tab](docs/sarif-code-scanning.png)
+-->
+> _Upload the generated `*_report.sarif` with the `github/codeql-action/upload-sarif` action (the bundled workflow does this) and findings appear in your repo's **Security -> Code scanning** tab with inline taint traces._
+
+**Who it's for.** AppSec engineers and security researchers who want an AI
+deep-dive on Monday and a PR gate on Tuesday — from the same tool.
+
+**What it is *not*.** Not a deterministic linter and not a source of ground
+truth. Findings are **LLM-generated triage candidates** that require human
+review; run only against code you own or are authorized to test.
+
+---
+
 ## Quickstart (60 seconds, zero LLM cost)
 
 ```bash
@@ -276,6 +330,13 @@ See `docs/` for the full reference.
 ## Security
 
 See [`SECURITY.md`](SECURITY.md). Don't open security issues in a public tracker.
+
+## Related projects
+
+Part of a small suite of local-first AI-security tools:
+
+- **[AI-RedTeam-skill](https://github.com/sam00/AI-RedTeam-skill)** — Authorized AI red-team planning skill and framework mapper for MITRE ATT&CK, ATLAS, OWASP LLM Top 10, and NIST AI RMF.
+- **[AI-TokenTrim](https://github.com/sam00/AI-TokenTrim)** — Local-first context compression for AI agents: cut LLM tokens, cost, and latency with reversible caching and MCP/proxy support.
 
 ## License
 
