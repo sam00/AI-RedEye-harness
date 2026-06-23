@@ -232,6 +232,22 @@ class Orchestrator:
                 )
             elif stage_id == "s7_dedupe":
                 all_findings = result.findings
+                # Baseline filter: drop findings the operator already
+                # accepted in ``.redeye-baseline.yaml``. No-op when the
+                # file doesn't exist.
+                from redeye.baseline import Baseline, filter_findings
+
+                baseline = Baseline.load(self.target)
+                if baseline.entries:
+                    kept, filtered = filter_findings(all_findings, baseline)
+                    all_findings = kept
+                    if filtered:
+                        result.artifacts["baseline_filtered"] = len(filtered)
+                        manifest.hallucination_metrics["baseline_filtered"] = (
+                            manifest.hallucination_metrics.get("baseline_filtered", 0)
+                            + len(filtered)
+                        )
+                        dropped.extend(filtered)
             elif stage_id == "s8_chain":
                 all_findings = result.findings or all_findings
             elif stage_id == "s8b_poc":

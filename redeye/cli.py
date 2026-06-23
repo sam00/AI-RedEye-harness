@@ -388,6 +388,57 @@ def init(
     sys.exit(rc)
 
 
+@main.group("baseline")
+def baseline_group() -> None:
+    """Manage the local baseline (accept findings so they don't reappear)."""
+
+
+@baseline_group.command("accept")
+@click.option("--finding-id", required=True, help="The F-NNNN id from a recent scan report.")
+@click.option(
+    "--manifest",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="run_manifest.json to look up the finding (default: ./out/run_manifest.json).",
+)
+@click.option("--rationale", default="", help="Why this finding was accepted (free text).")
+@click.pass_context
+def baseline_accept(
+    ctx: click.Context, finding_id: str, manifest: str | None, rationale: str
+) -> None:
+    """Accept a finding into the baseline so it's filtered from future scans."""
+    from redeye.commands.baseline import accept as run_accept
+
+    rc = run_accept(
+        console=ctx.obj["console"],
+        finding_id=finding_id,
+        manifest=Path(manifest) if manifest else None,
+        rationale=rationale,
+    )
+    sys.exit(rc)
+
+
+@baseline_group.command("list")
+@click.pass_context
+def baseline_list(ctx: click.Context) -> None:
+    """List all accepted baseline entries."""
+    from redeye.commands.baseline import list_entries
+
+    rc = list_entries(console=ctx.obj["console"])
+    sys.exit(rc)
+
+
+@baseline_group.command("remove")
+@click.argument("fingerprint")
+@click.pass_context
+def baseline_remove(ctx: click.Context, fingerprint: str) -> None:
+    """Remove a baseline entry by its fingerprint."""
+    from redeye.commands.baseline import remove as run_remove
+
+    rc = run_remove(console=ctx.obj["console"], fp=fingerprint)
+    sys.exit(rc)
+
+
 @main.command("collect-feedback")
 @click.option(
     "--comment-file",

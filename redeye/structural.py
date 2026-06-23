@@ -116,6 +116,145 @@ _SINK_PATTERNS: list[tuple[re.Pattern, str, str]] = [
     # JWT / auth
     (re.compile(r"jwt\.decode\s*\([^)]*verify\s*=\s*False"), "jwt_verify_off", "CWE-347"),
     (re.compile(r"['\"]none['\"]\s*[:,]\s*True"), "jwt_alg_none", "CWE-347"),
+    (re.compile(r"algorithms\s*=\s*\[\s*['\"]none['\"]"), "jwt_alg_none_list", "CWE-347"),
+    (re.compile(r"['\"]alg['\"]\s*:\s*['\"]none['\"]"), "jwt_alg_none_obj", "CWE-347"),
+    # ------------------------------------------------------------------
+    # Code injection / template / VM (CWE-95)
+    # ------------------------------------------------------------------
+    (re.compile(r"\bcompile\s*\("), "compile_call", "CWE-95"),
+    (re.compile(r"new\s+Function\s*\("), "js_new_function", "CWE-95"),
+    (re.compile(r"vm\.runIn(New|This)?Context\b"), "node_vm_run", "CWE-95"),
+    # ------------------------------------------------------------------
+    # Additional deserialization sinks
+    # ------------------------------------------------------------------
+    (re.compile(r"\bmarshal\.loads\b"), "marshal_loads", "CWE-502"),
+    (re.compile(r"\bunserialize\s*\("), "php_unserialize", "CWE-502"),
+    (re.compile(r"\bnode-serialize\b|\bserialize-javascript\b"), "node_unserialize", "CWE-502"),
+    # ------------------------------------------------------------------
+    # XXE -- XML External Entity (CWE-611)
+    # ------------------------------------------------------------------
+    (re.compile(r"\betree\.(parse|fromstring|XMLParser)\b"), "lxml_xxe_risk", "CWE-611"),
+    (
+        re.compile(r"xml\.etree\.ElementTree\.(parse|fromstring)"),
+        "etree_xxe_risk",
+        "CWE-611",
+    ),
+    (
+        re.compile(r"\bDocumentBuilderFactory\.newInstance\b(?![^.]*setFeature)"),
+        "java_dbf_xxe",
+        "CWE-611",
+    ),
+    (re.compile(r"\bSAXParserFactory\.newInstance\b"), "java_sax_xxe", "CWE-611"),
+    # ------------------------------------------------------------------
+    # SSTI -- Server-Side Template Injection (CWE-1336)
+    # ------------------------------------------------------------------
+    (re.compile(r"render_template_string\s*\(\s*[a-zA-Z_]"), "ssti_flask", "CWE-1336"),
+    (re.compile(r"\bjinja2\.Template\s*\(\s*[a-zA-Z_]"), "ssti_jinja", "CWE-1336"),
+    (
+        re.compile(r"\bEnvironment\(\)\.from_string\s*\(\s*[a-zA-Z_]"),
+        "ssti_jinja_env",
+        "CWE-1336",
+    ),
+    # ------------------------------------------------------------------
+    # XSS sinks (CWE-79)
+    # ------------------------------------------------------------------
+    (re.compile(r"\binnerHTML\s*="), "xss_innerhtml", "CWE-79"),
+    (re.compile(r"\bdangerouslySetInnerHTML\b"), "xss_react_dangerous", "CWE-79"),
+    (re.compile(r"document\.write\s*\("), "xss_document_write", "CWE-79"),
+    (re.compile(r"\.html\s*\(\s*[a-zA-Z_]"), "xss_jquery_html", "CWE-79"),
+    # ------------------------------------------------------------------
+    # SSRF (broader -- f-strings + httpx + concat)
+    # ------------------------------------------------------------------
+    (
+        re.compile(r"requests\.(get|post|put|delete|patch|head)\s*\(\s*f['\"]"),
+        "ssrf_http_fstring",
+        "CWE-918",
+    ),
+    (re.compile(r"\bhttpx\.(get|post|put|delete)\s*\(\s*[a-zA-Z_]"), "ssrf_httpx", "CWE-918"),
+    # ------------------------------------------------------------------
+    # CORS misconfiguration (CWE-942)
+    # ------------------------------------------------------------------
+    (
+        re.compile(r"Access-Control-Allow-Origin\s*[:,=]\s*['\"]\*['\"]"),
+        "cors_wildcard",
+        "CWE-942",
+    ),
+    (
+        re.compile(r"CORS\s*\([^)]*origins\s*=\s*['\"]\*['\"]"),
+        "cors_flask_wildcard",
+        "CWE-942",
+    ),
+    # ------------------------------------------------------------------
+    # Mass assignment (CWE-915)
+    # ------------------------------------------------------------------
+    (
+        re.compile(r"\.update\s*\(\s*\*\*\s*request\.(json|form|args|data|get_json)"),
+        "mass_assign_flask",
+        "CWE-915",
+    ),
+    (
+        re.compile(r"\.update\s*\(\s*req\.(body|query|params)"),
+        "mass_assign_express",
+        "CWE-915",
+    ),
+    (re.compile(r"setattr\s*\([^)]*request\."), "mass_assign_setattr", "CWE-915"),
+    # ------------------------------------------------------------------
+    # NoSQL injection (CWE-943)
+    # ------------------------------------------------------------------
+    (
+        re.compile(r"mongo\.db\.[a-zA-Z_]+\.find\s*\(\s*request\."),
+        "mongo_find_taint",
+        "CWE-943",
+    ),
+    (re.compile(r"\$where\s*:\s*['\"]"), "mongo_where_string", "CWE-943"),
+    # ------------------------------------------------------------------
+    # Open redirect (CWE-601)
+    # ------------------------------------------------------------------
+    (
+        re.compile(r"redirect\s*\(\s*request\.(args|values|json|form)"),
+        "open_redirect_flask",
+        "CWE-601",
+    ),
+    (
+        re.compile(r"res\.redirect\s*\(\s*req\.(query|body|params)"),
+        "open_redirect_express",
+        "CWE-601",
+    ),
+    # ------------------------------------------------------------------
+    # Polyglot: Java JDBC, PHP queries, Go Sprintf SQL, Ruby raw AR,
+    # Node child_process, Java Runtime exec, Go os/exec, Ruby system
+    # ------------------------------------------------------------------
+    (
+        re.compile(r"\bStatement\s*\.\s*execute(Query|Update)?\b"),
+        "java_jdbc_execute",
+        "CWE-89",
+    ),
+    (
+        re.compile(r"\bmysql_query\s*\(|\bmysqli_query\s*\(|->\s*query\s*\("),
+        "php_mysql_query",
+        "CWE-89",
+    ),
+    (re.compile(r"db\.(Query|Exec)\s*\(\s*fmt\.Sprintf"), "go_sql_sprintf", "CWE-89"),
+    (
+        re.compile(r"\.find_by_sql\b|\.where\s*\(\s*['\"][^'\"]*#\{"),
+        "ruby_ar_raw",
+        "CWE-89",
+    ),
+    (
+        re.compile(r"child_process\.(exec|execSync|spawn)\s*\("),
+        "node_child_process",
+        "CWE-78",
+    ),
+    (
+        re.compile(r"Runtime\.getRuntime\(\)\.exec\b|new\s+ProcessBuilder\b"),
+        "java_runtime_exec",
+        "CWE-78",
+    ),
+    (re.compile(r"\bexec\.Command\s*\("), "go_exec_command", "CWE-78"),
+    # Weak crypto extras
+    (re.compile(r"AES\.new\([^,]+,\s*AES\.MODE_ECB"), "aes_ecb_mode", "CWE-327"),
+    (re.compile(r"\bMath\.random\s*\(\s*\)"), "js_math_random", "CWE-338"),
+    (re.compile(r"\bInsecureSkipVerify\s*:\s*true"), "go_tls_skip_verify", "CWE-295"),
 ]
 
 # Common-shape secret regex. Aggressive on purpose -- the LLM downgrades obvious test fixtures.
