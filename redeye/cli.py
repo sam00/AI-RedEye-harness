@@ -90,7 +90,11 @@ def setup(ctx: click.Context, install_agents: bool, profile: str | None) -> None
 
 
 @main.command()
-@click.option("--profile", default=None, help="Profile to probe (default: active).")
+@click.option(
+    "--profile",
+    default=None,
+    help="Profile to probe (default: auto-detect the best-available backend).",
+)
 @click.option("--no-network", is_flag=True, help="Skip live backend probes.")
 @click.pass_context
 def doctor(ctx: click.Context, profile: str | None, no_network: bool) -> None:
@@ -105,7 +109,11 @@ def doctor(ctx: click.Context, profile: str | None, no_network: bool) -> None:
 @click.option(
     "--repo", required=True, type=click.Path(exists=True, file_okay=False), help="Path to repo."
 )
-@click.option("--profile", default=None, help="Profile to use for cost model.")
+@click.option(
+    "--profile",
+    default=None,
+    help="Profile to use for cost model (default: auto-detect best backend).",
+)
 @click.pass_context
 def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
     """Print scope and approximate USD cost for a scan. No LLM calls."""
@@ -125,7 +133,16 @@ def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
     type=click.Path(exists=True, dir_okay=False),
     help="CSV file of repos for batch scanning.",
 )
-@click.option("--profile", default=None, help="Profile name or path.")
+@click.option(
+    "--profile",
+    default=None,
+    help=(
+        "Profile name (default | cli | full | mock | auto) or path to YAML. "
+        "When unspecified, RedEye auto-detects the best-available backend "
+        "on this machine -- pass --profile default to force the bundled "
+        "default profile instead."
+    ),
+)
 @click.option("--application-id", default=None, help="External AppId for traceability.")
 @click.option(
     "--workspace",

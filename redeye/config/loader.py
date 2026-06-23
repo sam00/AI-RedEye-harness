@@ -108,7 +108,33 @@ def _candidate_paths(profile: str | None) -> tuple[list[Path], bool]:
 
 
 def load_profile(profile: str | None = None) -> Profile:
-    """Resolve and load a profile. Raises :class:`ConfigError` on failure."""
+    """Resolve and load a profile. Raises :class:`ConfigError` on failure.
+
+    Special cases handled before the YAML resolution chain:
+
+    - ``profile == "auto"`` -- synthesize a profile at runtime by detecting
+      the best-available backend on the operator's machine. See
+      :mod:`redeye.auto`.
+    - ``profile is None`` AND no ``REDEYE_PROFILE`` env var AND no
+      ``./config.yaml`` -- fall back to ``auto`` (rather than the bundled
+      ``default.yaml``) so new users get a working scan without first
+      learning what profiles exist. If the operator wants the literal
+      bundled default, they can pass ``--profile default`` explicitly.
+    """
+    if profile == "auto":
+        from redeye.auto import build_auto_profile
+
+        return build_auto_profile()
+
+    if (
+        profile is None
+        and not os.environ.get("REDEYE_PROFILE")
+        and not (Path.cwd() / "config.yaml").exists()
+    ):
+        from redeye.auto import build_auto_profile
+
+        return build_auto_profile()
+
     candidates, strict = _candidate_paths(profile)
     last_error: Exception | None = None
     for candidate in candidates:
