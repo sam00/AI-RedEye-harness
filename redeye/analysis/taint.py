@@ -9,8 +9,8 @@ This is the deterministic layer that upgrades RedEye findings from
 +/- 5 lines of each other") to **proven dataflow** ("variable v starts
 at request.json['x'] on line 12, no sanitizer touches it, and it's
 passed to cursor.execute on line 20"). Combined with the existing
-structural index, this closes the VVAH precision gap without taking a
-single LLM token.
+structural index, this closes the co-occurrence-vs-proven-flow precision
+gap without taking a single LLM token.
 
 Limitations (called out so callers don't overclaim):
 

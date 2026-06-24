@@ -103,6 +103,15 @@ stages:
     max_budget_usd: 1.00
     params:
       strict: false
+  s8c_verify:
+    # Deterministic K-of-N outcome verification. No LLM cost. Flags findings
+    # that don't clear the bar (or drops them under --require-verified).
+    skill: outcome_verifier
+    role: validator
+    max_budget_usd: 0.00
+    params:
+      threshold: 3
+      strict: false
   s9_emit:
     skill: emit
     role: reporter

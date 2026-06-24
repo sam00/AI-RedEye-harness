@@ -35,6 +35,7 @@ from redeye.pipeline.stages import (
     s7_dedupe,
     s8_chain,
     s8b_poc,
+    s8c_verify,
     s9_emit,
 )
 from redeye.pipeline.voting import vote_on_findings
@@ -56,6 +57,7 @@ _STAGE_ORDER: list[tuple[str, Callable[..., StageResult]]] = [
     ("s7_dedupe", s7_dedupe.run),
     ("s8_chain", s8_chain.run),
     ("s8b_poc", s8b_poc.run),  # optional; demands concrete PoC
+    ("s8c_verify", s8c_verify.run),  # optional; deterministic outcome verification
     ("s9_emit", s9_emit.run),
 ]
 
@@ -256,6 +258,22 @@ class Orchestrator:
                 manifest.hallucination_metrics["missing_poc"] = manifest.hallucination_metrics.get(
                     "missing_poc", 0
                 ) + int(metrics.get("no_poc_demoted", 0))
+            elif stage_id == "s8c_verify":
+                vmetrics = result.artifacts.get("verification_metrics", {}) or {}
+                pre_ids = {f.id for f in all_findings}
+                post_ids = {f.id for f in result.findings}
+                dropped_now = [f for f in all_findings if f.id in (pre_ids - post_ids)]
+                all_findings = result.findings
+                if dropped_now:
+                    dropped.extend(dropped_now)
+                    manifest.hallucination_metrics["outcome_unverified_dropped"] = (
+                        manifest.hallucination_metrics.get("outcome_unverified_dropped", 0)
+                        + len(dropped_now)
+                    )
+                manifest.hallucination_metrics["outcome_unverified"] = (
+                    manifest.hallucination_metrics.get("outcome_unverified", 0)
+                    + int(vmetrics.get("unverified", 0))
+                )
             elif stage_id == "s9_emit":
                 result.artifacts["finding_count"] = len(all_findings)
                 result.artifacts["dropped_count"] = len(dropped)

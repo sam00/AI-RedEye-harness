@@ -1,7 +1,18 @@
 RedEye
-Copyright 2026 RedEye contributors
+Copyright 2026 Sam Gupta
 
-This product includes software developed under the Apache License, Version 2.0.
+RedEye is a derivative work of the Visa Vulnerability Agentic Harness (VVAH),
+Copyright 2026 Visa, Inc., used under the Apache License, Version 2.0:
+    https://github.com/visa/visa-vulnerability-agentic-harness
+
+RedEye reworks and extends VVAH; its source code has been substantially
+rewritten while retaining VVAH's overall architecture and scaffolding.
+
+This product is licensed under the Apache License, Version 2.0 (the
+"License"); you may not use this product except in compliance with the
+License. You may obtain a copy of the License at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
 
 All trademarks used herein belong to their respective owners. Use of these
 names does not imply endorsement.

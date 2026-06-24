@@ -24,15 +24,16 @@ Multi-cloud LLM by design: Anthropic (CLI / SDK), OpenAI / OpenAI-compatible, **
 
 **The problem it solves.** AI-generated SAST is noisy — models invent file
 paths, hallucinate sinks, and bury reviewers in false positives. RedEye puts
-six deterministic checks (structural pre-index, taint schema, grounding pass,
-validator auto-reject, PoC gate, multi-agent voting) *in front of* every
+seven deterministic checks (structural pre-index, taint schema, grounding pass,
+validator auto-reject, PoC gate, multi-agent voting, outcome verification)
+*in front of* every
 finding, so what reaches you cites real code and survived every cheap check the
 harness can run.
 
 **60-second quickstart.** No API keys, deterministic mock backend — full steps
 in [Quickstart](#quickstart-60-seconds-zero-llm-cost) just below:
 ```bash
-git clone https://github.com/sam00/AI-RedEye-harness.git redeye && cd redeye
+git clone https://github.com/sam00/AI-RedEye-Harness.git redeye && cd redeye
 make install && make demo      # writes ./out/*.md + *.sarif, zero LLM cost
 ```
 
@@ -40,7 +41,7 @@ make install && make demo      # writes ./out/*.md + *.sarif, zero LLM cost
 `security-severity` and taint `codeFlows`, so they render natively in GitHub
 Code Scanning:
 
-![redeye scan — deterministic mock demo: 4 candidate findings, all filtered by the validator, 0 false positives delivered](docs/demo-run.svg)
+![redeye scan — deterministic mock demo: the full 14-stage pipeline (including outcome verification, S8c) filters 4 candidate findings down to 0 false positives delivered](docs/demo-run.svg)
 
 ```jsonc
 // excerpt of *_report.sarif (GitHub renders this inline on the PR + Security tab)
@@ -74,10 +75,28 @@ review; run only against code you own or are authorized to test.
 
 ---
 
+## Capabilities at a glance
+
+- **Agentic multi-stage pipeline** — 14 stages spanning attack-surface mapping, threat modeling, multi-lens research, adversarial review, multi-agent voting, dedupe, exploit chaining, PoC, **outcome verification (S8c)**, and SARIF/Markdown emit.
+- **Seven-layer hallucination control** — structural pre-index, taint-flow schema, grounding pass, validator auto-reject, PoC gate, multi-agent voting, and a deterministic **K-of-N outcome verifier** — with a per-finding evidence trail and `hallucination_metrics`.
+- **Multi-cloud + offline backends** — Anthropic (SDK/CLI), OpenAI, AWS Bedrock, Google Vertex (Gemini), local Ollama, and a deterministic mock; auto-detected, no single provider required.
+- **Dual-mode, preset-driven** — `--preset deep` for research, `--preset pr`/`ci` for gating, `--preset quick` for a zero-cost mock demo.
+- **CI/CD + feedback loop** — diff-only PR scans, DoS scope caps, SARIF 2.1.0 with taint `codeFlows`, PR comments with TP/FP checkboxes, a SQLite feedback loop folded into the next scan, and webhooks.
+- **Enterprise foundation** — multi-target batch intake (`--repo-file`) plus file-first CMDB / CVE-feed / control enrichment (asset criticality, CVE↔CWE correlation); _pipeline wiring in progress_.
+- **Auditable by default** — every run writes `run_manifest.json`: tool version, profile, config hash, target SHA, and per-stage cost + quality metrics.
+
+---
+
+## Built on prior art
+
+RedEye started from the open-source ideas in Visa's **[Vulnerability Agentic Harness (VVAH)](https://github.com/visa/visa-vulnerability-agentic-harness)** (Apache-2.0) and has since been substantially reworked and extended — the capabilities above are RedEye's own. Full upstream attribution is preserved in [`NOTICE`](NOTICE) and the [Attribution](#attribution) note at the end.
+
+---
+
 ## Quickstart (60 seconds, zero LLM cost)
 
 ```bash
-git clone https://github.com/sam00/AI-RedEye-harness.git redeye
+git clone https://github.com/sam00/AI-RedEye-Harness.git redeye
 cd redeye
 make install           # python3 -m venv + pip install -e ".[dev]"
 make demo              # mock-backend scan against ./, writes ./out/*.md + .sarif
@@ -85,7 +104,7 @@ make demo              # mock-backend scan against ./, writes ./out/*.md + .sari
 
 That's it -- you have a working install and a complete sample report in
 `./out/`. The mock backend is deterministic, needs no API keys, and exercises
-all 13 pipeline stages.
+all 14 pipeline stages.
 
 When you're ready to run with a real LLM:
 
@@ -122,7 +141,7 @@ grounding and exclusions but bumps the file cap to 200.
 
 ## What's new in 0.3 -- the hallucination-reduction layer
 
-Six new filters in front of the report, designed so a finding can't reach
+Seven new filters in front of the report, designed so a finding can't reach
 the operator without surviving every cheap deterministic check the harness
 knows how to run. See [`docs/REDUCING_HALLUCINATIONS.md`](docs/REDUCING_HALLUCINATIONS.md)
 for the long-form rationale.
@@ -145,9 +164,16 @@ for the long-form rationale.
   payload -- syntactic checks reject placeholders. Findings without a
   real PoC get demoted by one severity notch (or dropped with
   ``--require-poc``).
+- **Outcome verification (S8c, deterministic).** A final K-of-N verdict
+  over five independent signals already gathered upstream (grounding,
+  taint completeness, concrete PoC, reachability, voter/validator
+  agreement). Temperature-free, so it suppresses false positives even on
+  models that reject ``temperature`` (Opus / ``cli``) where voting is a
+  no-op. Unverified findings are flagged, or dropped when its ``strict``
+  param is set.
 - **Quality metrics in the manifest and report.** Counters for
   ``raw_lens``, ``ungrounded_dropped``, ``ungrounded_downgraded``,
-  ``validator_rejected``, ``voted_out``, ``missing_poc``. Operators see
+  ``validator_rejected``, ``voted_out``, ``missing_poc``, ``outcome_unverified``. Operators see
   exactly how much noise the harness pruned before they read anything.
 - **Per-finding evidence list.** Every survivor carries a list of
   ``[PASS]`` / ``[FAIL]`` rows showing which checks it passed. The
@@ -331,13 +357,10 @@ See `docs/` for the full reference.
 
 See [`SECURITY.md`](SECURITY.md). Don't open security issues in a public tracker.
 
-## Related projects
-
-Part of a small suite of local-first AI-security tools:
-
-- **[AI-RedTeam-skill](https://github.com/sam00/AI-RedTeam-skill)** — Authorized AI red-team planning skill and framework mapper for MITRE ATT&CK, ATLAS, OWASP LLM Top 10, and NIST AI RMF.
-- **[AI-TokenTrim](https://github.com/sam00/AI-TokenTrim)** — Local-first context compression for AI agents: cut LLM tokens, cost, and latency with reversible caching and MCP/proxy support.
-
 ## License
 
 Apache-2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+
+### Attribution
+
+RedEye is a **derivative work of the [Visa Vulnerability Agentic Harness (VVAH)](https://github.com/visa/visa-vulnerability-agentic-harness)**, Copyright 2026 Visa, Inc., used under the Apache License, Version 2.0. RedEye's architecture, scaffolding, and documentation derive from VVAH; the source code has been substantially reworked and extended. Per Apache-2.0 §4, the upstream copyright and attribution are retained in [`NOTICE`](NOTICE).

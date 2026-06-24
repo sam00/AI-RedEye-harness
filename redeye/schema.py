@@ -135,6 +135,38 @@ class ProofOfConcept(BaseModel):
     )
 
 
+class VerificationResult(BaseModel):
+    """Final outcome-verification verdict for a finding (stage S8c).
+
+    Collapses the independent signals earlier stages already gathered
+    (grounding, taint completeness, concrete PoC, reachability, voter
+    agreement) into a single auditable verdict. Deterministic by default,
+    so it works identically on every backend -- including ones that reject
+    ``temperature`` (Opus / cli) where multi-agent voting is a no-op.
+    """
+
+    verified: bool = False
+    score: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="signals_passed / signals_considered"
+    )
+    signals: dict[str, bool] = Field(
+        default_factory=dict,
+        description="Per-signal pass/fail (grounded, taint_complete, concrete_poc, reachable, vote_confirmed).",
+    )
+    threshold: int = Field(
+        default=3, ge=1, description="K independent signals required for verified=True."
+    )
+    method: str = Field(default="deterministic", description="deterministic | self_consistency")
+    samples: int = Field(default=0, ge=0, description="Self-consistency samples taken (0 = none).")
+    agreement: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of self-consistency samples that confirmed.",
+    )
+    rationale: str = Field(default="", max_length=1000)
+
+
 class Finding(BaseModel):
     """A single triage candidate produced by the pipeline.
 
@@ -184,6 +216,9 @@ class Finding(BaseModel):
     )
     poc: ProofOfConcept | None = Field(
         default=None, description="Concrete exploit demonstration (S8b)."
+    )
+    verification: VerificationResult | None = Field(
+        default=None, description="Outcome-verification verdict (S8c)."
     )
     # ---- audit trail ---------------------------------------------------
     tags: list[str] = Field(default_factory=list)

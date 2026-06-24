@@ -27,9 +27,9 @@ def test_full_pipeline_runs_against_mock(tiny_repo: Path) -> None:
     assert manifest.application_id == "APP-TEST"
     assert manifest.ended_at is not None
     assert manifest.finding_count >= 0
-    # Mock profile enables all 13 stages: the original 9 plus
-    # s1b_structural, s4b_grounding, s6b_validator, and s8b_poc.
-    assert len(manifest.stages) == 13
+    # Mock profile enables all 14 stages: the original 9 plus
+    # s1b_structural, s4b_grounding, s6b_validator, s8b_poc, and s8c_verify.
+    assert len(manifest.stages) == 14
 
     md_files = list(out_dir.glob("*_report.md"))
     sarif_files = list(out_dir.glob("*_report.sarif"))

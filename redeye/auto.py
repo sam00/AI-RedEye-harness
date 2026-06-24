@@ -230,6 +230,12 @@ def build_auto_profile(*, probe_network: bool = True) -> Profile:
         "s8b_poc": Stage(
             skill="poc_gate", role="validator", max_budget_usd=0.5, params={"strict": False}
         ),
+        "s8c_verify": Stage(
+            skill="outcome_verifier",
+            role="validator",
+            max_budget_usd=0.0,
+            params={"threshold": 3, "strict": False},
+        ),
         "s9_emit": Stage(skill="emit", role="reporter", max_budget_usd=0.1),
     }
 

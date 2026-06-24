@@ -20,6 +20,7 @@ from redeye.pipeline.stages import (
     s7_dedupe,
     s8_chain,
     s8b_poc,
+    s8c_verify,
     s9_emit,
 )
 
@@ -36,5 +37,6 @@ __all__ = [
     "s7_dedupe",
     "s8_chain",
     "s8b_poc",
+    "s8c_verify",
     "s9_emit",
 ]

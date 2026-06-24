@@ -52,6 +52,11 @@ stages:
     role: reporter
     max_budget_usd: 0.0
     params: { strict: false }
+  s8c_verify:
+    skill: outcome_verifier
+    role: reporter
+    max_budget_usd: 0.0
+    params: { threshold: 3, strict: false }
   s9_emit:           { skill: emit,                  role: reporter, max_budget_usd: 0.0 }
 
 voting:
