@@ -21,9 +21,11 @@ def write_manifest(output_dir: Path, manifest: RunManifest, *, redact: bool = Tr
 
     When ``redact`` is True (default) obvious secret material (credential
     shapes, sensitive ``key: value`` pairs in embedded snippets / descriptions)
-    is masked before the file is written. ``redact_secrets`` only replaces
-    matched substrings with a quote-free token, so the JSON stays valid. The
-    styled PDF is built from this manifest, so it inherits the redaction.
+    is masked before the file is written. Redaction runs over the payload's
+    string *values* (via ``redact_obj``) rather than the serialized JSON, so the
+    serializer always re-escapes correctly and the manifest stays valid JSON --
+    masking the serialized text could eat an escaped ``\\"`` and corrupt it. The
+    styled PDF / HTML are built from this manifest, so they inherit the masking.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -32,11 +34,11 @@ def write_manifest(output_dir: Path, manifest: RunManifest, *, redact: bool = Tr
     archived = output_dir / f"run_manifest_{timestamp}.json"
 
     payload = manifest.model_dump(mode="json")
-    text = json.dumps(payload, indent=2, sort_keys=True)
     if redact:
-        from redeye.redaction import redact_secrets
+        from redeye.redaction import redact_obj
 
-        text = redact_secrets(text)
+        payload = redact_obj(payload)
+    text = json.dumps(payload, indent=2, sort_keys=True)
     canonical.write_text(text, encoding="utf-8")
     archived.write_text(text, encoding="utf-8")
 

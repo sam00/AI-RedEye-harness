@@ -63,3 +63,24 @@ def redact_secrets(text: str) -> str:
         out = pat.sub(MASK, out)
     out = _ASSIGNMENT_RE.sub(_mask_assignment, out)
     return out
+
+
+def redact_obj(obj: object) -> object:
+    """Recursively redact secret material in the string values of a JSON-like
+    object (dicts, lists, scalars).
+
+    This is the JSON-safe entry point: redaction must run on the *structure*
+    (before serialization), never on serialized JSON text. Running the
+    assignment regex over already-serialized JSON can eat the backslash of an
+    escaped ``\\"`` inside an embedded code snippet, leaving a bare quote that
+    prematurely terminates the JSON string and corrupts the document. Operating
+    on values lets the serializer re-escape correctly, so the output is always
+    valid JSON.
+    """
+    if isinstance(obj, str):
+        return redact_secrets(obj)
+    if isinstance(obj, dict):
+        return {k: redact_obj(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [redact_obj(v) for v in obj]
+    return obj

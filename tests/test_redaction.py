@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from redeye.output.markdown import write_markdown_report
-from redeye.redaction import MASK, redact_secrets
+from redeye.redaction import MASK, redact_obj, redact_secrets
 from redeye.schema import Finding, Location, Severity
 
 
@@ -57,3 +58,30 @@ def test_markdown_report_redact_opt_out(tmp_path: Path) -> None:
         path=path, target=tmp_path, application_id=None, findings=[f], redact=False
     )
     assert "ghp_" + "a" * 36 in path.read_text(encoding="utf-8")
+
+
+def test_redact_obj_walks_structure_and_masks() -> None:
+    data = {
+        "findings": [
+            {"description": 'api_key: "supersecretvalue123"', "line": 12},
+        ],
+        "count": 1,
+        "ok": True,
+    }
+    out = redact_obj(data)
+    assert "supersecretvalue123" not in json.dumps(out)
+    assert MASK in out["findings"][0]["description"]
+    # Non-string scalars are left untouched.
+    assert out["count"] == 1 and out["ok"] is True
+
+
+def test_redact_obj_keeps_json_valid_with_escaped_quotes() -> None:
+    # Regression: a code snippet whose secret value is wrapped in quotes used
+    # to corrupt the manifest when redaction ran over *serialized* JSON -- the
+    # regex ate the backslash of an escaped \" and left a bare quote. Redacting
+    # the object's values (then serializing) must always yield parseable JSON.
+    snippet = '    secret = os.environ.get("REDEYE_WEBHOOK_SECRET")'
+    payload = {"stages": [{"findings": [{"snippet": snippet}]}]}
+    text = json.dumps(redact_obj(payload), indent=2, sort_keys=True)
+    reparsed = json.loads(text)  # must not raise
+    assert MASK in reparsed["stages"][0]["findings"][0]["snippet"]

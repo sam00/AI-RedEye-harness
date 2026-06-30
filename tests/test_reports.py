@@ -118,3 +118,25 @@ def test_scan_emits_html_and_schema(tiny_repo: Path) -> None:
     # Schema is dropped next to the manifest automatically.
     assert (out / "run_manifest.schema.json").is_file()
     assert validate_manifest_file(out / "run_manifest.json") == []
+
+
+def test_scan_html_with_quoted_secret_snippet_stays_valid(tmp_path: Path) -> None:
+    # Regression: scanning a file whose snippet embeds a quoted secret used to
+    # corrupt the manifest (redaction ran over serialized JSON), which then
+    # crashed the --html renderer when it re-read the manifest.
+    repo = tmp_path / "repo"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "cfg.py").write_text(
+        'import os\nsecret = os.environ.get("WEBHOOK_SECRET")\n', encoding="utf-8"
+    )
+    out = tmp_path / "out"
+    rc = CliRunner().invoke(
+        main,
+        ["scan", "--repo", str(repo), "--profile", "mock", "--html",
+         "--output-dir", str(out)],
+    )
+    assert rc.exit_code == 0, rc.output
+    assert (out / "report.html").is_file()
+    # Manifest must be parseable valid JSON (the bug produced a bare quote).
+    json.loads((out / "run_manifest.json").read_text(encoding="utf-8"))
+    assert validate_manifest_file(out / "run_manifest.json") == []
