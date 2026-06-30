@@ -73,7 +73,7 @@ def test_html_report_is_self_contained(tmp_path: Path) -> None:
     text = out.read_text(encoding="utf-8")
     assert "<!DOCTYPE html>" in text
     assert "SQL injection" in text
-    assert "data-severity=\"high\"" in text
+    assert 'data-severity="high"' in text
     # No external asset references.
     assert "http://" not in text and "https://" not in text
     assert "<script>" in text  # interactive filtering inlined
@@ -110,8 +110,7 @@ def test_scan_emits_html_and_schema(tiny_repo: Path) -> None:
     runner = CliRunner()
     rc = runner.invoke(
         main,
-        ["scan", "--repo", str(tiny_repo), "--profile", "mock", "--html",
-         "--output-dir", str(out)],
+        ["scan", "--repo", str(tiny_repo), "--profile", "mock", "--html", "--output-dir", str(out)],
     )
     assert rc.exit_code == 0, rc.output
     assert (out / "report.html").is_file()
@@ -132,8 +131,7 @@ def test_scan_html_with_quoted_secret_snippet_stays_valid(tmp_path: Path) -> Non
     out = tmp_path / "out"
     rc = CliRunner().invoke(
         main,
-        ["scan", "--repo", str(repo), "--profile", "mock", "--html",
-         "--output-dir", str(out)],
+        ["scan", "--repo", str(repo), "--profile", "mock", "--html", "--output-dir", str(out)],
     )
     assert rc.exit_code == 0, rc.output
     assert (out / "report.html").is_file()

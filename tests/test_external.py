@@ -19,19 +19,29 @@ def test_sarif_ingestion(tmp_path: Path) -> None:
         "version": "2.1.0",
         "runs": [
             {
-                "tool": {"driver": {"name": "CodeQL", "rules": [
-                    {"id": "py/sql-injection", "properties": {"tags": ["external/cwe/cwe-089"]}}
-                ]}},
+                "tool": {
+                    "driver": {
+                        "name": "CodeQL",
+                        "rules": [
+                            {
+                                "id": "py/sql-injection",
+                                "properties": {"tags": ["external/cwe/cwe-089"]},
+                            }
+                        ],
+                    }
+                },
                 "results": [
                     {
                         "ruleId": "py/sql-injection",
                         "level": "error",
                         "message": {"text": "SQL injection"},
                         "locations": [
-                            {"physicalLocation": {
-                                "artifactLocation": {"uri": "app/users.py"},
-                                "region": {"startLine": 42},
-                            }}
+                            {
+                                "physicalLocation": {
+                                    "artifactLocation": {"uri": "app/users.py"},
+                                    "region": {"startLine": 42},
+                                }
+                            }
                         ],
                     }
                 ],
@@ -101,19 +111,31 @@ def test_sarif_codeql_ruleindex_relationships_snippet(tmp_path: Path) -> None:
         "version": "2.1.0",
         "runs": [
             {
-                "tool": {"driver": {"name": "CodeQL", "rules": [
-                    {"id": "py/path-injection",
-                     "relationships": [{"target": {"id": "CWE-022"}}]},
-                ]}},
+                "tool": {
+                    "driver": {
+                        "name": "CodeQL",
+                        "rules": [
+                            {
+                                "id": "py/path-injection",
+                                "relationships": [{"target": {"id": "CWE-022"}}],
+                            },
+                        ],
+                    }
+                },
                 "results": [
                     {
                         "ruleIndex": 0,
                         "message": {"text": ""},
                         "locations": [
-                            {"physicalLocation": {
-                                "artifactLocation": {"uri": "app/files.py"},
-                                "region": {"startLine": 7, "snippet": {"text": "open(user_path)"}},
-                            }}
+                            {
+                                "physicalLocation": {
+                                    "artifactLocation": {"uri": "app/files.py"},
+                                    "region": {
+                                        "startLine": 7,
+                                        "snippet": {"text": "open(user_path)"},
+                                    },
+                                }
+                            }
                         ],
                     },
                     {
@@ -121,10 +143,12 @@ def test_sarif_codeql_ruleindex_relationships_snippet(tmp_path: Path) -> None:
                         "message": {"text": "suppressed one"},
                         "suppressions": [{"kind": "external"}],
                         "locations": [
-                            {"physicalLocation": {
-                                "artifactLocation": {"uri": "app/other.py"},
-                                "region": {"startLine": 1},
-                            }}
+                            {
+                                "physicalLocation": {
+                                    "artifactLocation": {"uri": "app/other.py"},
+                                    "region": {"startLine": 1},
+                                }
+                            }
                         ],
                     },
                 ],
@@ -182,8 +206,12 @@ def test_trivy_ingestion(tmp_path: Path) -> None:
             {
                 "Target": "Dockerfile",
                 "Misconfigurations": [
-                    {"ID": "DS002", "Title": "root user", "Severity": "HIGH",
-                     "CauseMetadata": {"StartLine": 3}}
+                    {
+                        "ID": "DS002",
+                        "Title": "root user",
+                        "Severity": "HIGH",
+                        "CauseMetadata": {"StartLine": 3},
+                    }
                 ],
             }
         ],
@@ -200,8 +228,11 @@ def test_grype_ingestion(tmp_path: Path) -> None:
     grype = {
         "matches": [
             {
-                "vulnerability": {"id": "CVE-2021-1234", "severity": "Critical",
-                                  "description": "rce"},
+                "vulnerability": {
+                    "id": "CVE-2021-1234",
+                    "severity": "Critical",
+                    "description": "rce",
+                },
                 "artifact": {"name": "libfoo", "locations": [{"path": "requirements.txt"}]},
             }
         ]
@@ -251,9 +282,7 @@ def test_merge_flags_reachable_when_source_colocated(tmp_path: Path) -> None:
     from redeye.structural import StructuralHit
 
     index = StructuralIndex()
-    index.sources.append(
-        StructuralHit("app/x.py", 2, "http_input", "source", "request.args")
-    )
+    index.sources.append(StructuralHit("app/x.py", 2, "http_input", "source", "request.args"))
     rows = [{"path": "app/x.py", "line": 9, "rule": "r1", "tool": "t1", "cwe": "CWE-89"}]
     f = _write(tmp_path / "g.json", rows)
     report = load_external_reports([f])

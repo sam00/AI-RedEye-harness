@@ -77,9 +77,7 @@ def _callee_names(node: ast.AST) -> set[str]:
     return names
 
 
-def build_cross_file_flows(
-    *, target: Path, file_paths: list[Path], cap: int = 50
-) -> list[dict]:
+def build_cross_file_flows(*, target: Path, file_paths: list[Path], cap: int = 50) -> list[dict]:
     """Return cross-file source->sink flows discovered by the call graph."""
     funcs: list[_Func] = []
     for fp in file_paths:

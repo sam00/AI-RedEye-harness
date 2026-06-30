@@ -43,7 +43,7 @@ def test_detects_cross_file_flow(tmp_path: Path) -> None:
 def test_same_file_flow_not_reported(tmp_path: Path) -> None:
     (tmp_path / "m.py").write_text(
         "def helper(name):\n"
-        "    cursor.execute(f\"SELECT {name}\")\n"
+        '    cursor.execute(f"SELECT {name}")\n'
         "def handler():\n"
         "    name = request.args.get('x')\n"
         "    helper(name)\n",

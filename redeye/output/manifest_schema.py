@@ -34,9 +34,7 @@ def write_manifest_schema(output_dir: Path) -> Path:
     """Write ``run_manifest.schema.json`` into ``output_dir`` and return it."""
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / SCHEMA_FILENAME
-    path.write_text(
-        json.dumps(manifest_json_schema(), indent=2, sort_keys=True), encoding="utf-8"
-    )
+    path.write_text(json.dumps(manifest_json_schema(), indent=2, sort_keys=True), encoding="utf-8")
     return path
 
 

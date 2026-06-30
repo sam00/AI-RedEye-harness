@@ -59,12 +59,18 @@ def _style(name: str, parent: str = "BodyText", **kw) -> ParagraphStyle:
 
 
 H1 = _style("CapH1", "Heading1", fontSize=24, leading=28, textColor=PURPLE, spaceAfter=12)
-H2 = _style("CapH2", "Heading2", fontSize=16, leading=20, textColor=PURPLE, spaceBefore=16, spaceAfter=6)
-H3 = _style("CapH3", "Heading3", fontSize=12.5, leading=16, textColor=DARK, spaceBefore=10, spaceAfter=4)
+H2 = _style(
+    "CapH2", "Heading2", fontSize=16, leading=20, textColor=PURPLE, spaceBefore=16, spaceAfter=6
+)
+H3 = _style(
+    "CapH3", "Heading3", fontSize=12.5, leading=16, textColor=DARK, spaceBefore=10, spaceAfter=4
+)
 BODY = _style("CapBody", "BodyText", fontSize=10, leading=14, textColor=DARK, spaceAfter=6)
 SMALL = _style("CapSmall", "BodyText", fontSize=8.5, leading=11, textColor=MUTED)
 CENTER = _style("CapCenter", "BodyText", fontSize=14, alignment=TA_CENTER, textColor=DARK)
-BULLET = _style("CapBullet", "BodyText", fontSize=10, leading=14, textColor=DARK, leftIndent=14, spaceAfter=2)
+BULLET = _style(
+    "CapBullet", "BodyText", fontSize=10, leading=14, textColor=DARK, leftIndent=14, spaceAfter=2
+)
 
 
 def esc(text: Any) -> str:
@@ -119,34 +125,104 @@ def bullets(story: list, items: list[str]) -> None:
 # ---------------------------------------------------------------------------
 
 PIPELINE = [
-    ("S1", "s1_attack_surface", "attack_surface_mapper", "LLM",
-     "Walks the repo, identifies entrypoints, sensitive sinks, auth boundaries; emits the attack-surface map. Owns repo-intake knobs."),
-    ("S1b", "s1b_structural", "structural_index", "Deterministic",
-     "Regex + AST ground-truth inventory: routes, sources, sinks, secrets. Folds external scanner reports into the map. Zero LLM cost."),
-    ("S2", "s2_threat_model", "threat_modeler", "LLM",
-     "STRIDE/OWASP threat model over the surface + structural evidence. Configurable threat/evidence caps and a threat baseline."),
-    ("S3", "s3_strategize", "research_strategist", "LLM",
-     "Chooses which research lenses to spend budget on, guided by the threat model."),
-    ("S4", "s4_research", "research_lenses", "LLM",
-     "The core finding generator: language, crypto, logic, access-control and IaC lenses produce candidate findings with taint flow."),
-    ("S4b", "s4b_grounding", "(grounding pass)", "Deterministic",
-     "Verifies every cited file path, line number and snippet against real code. Drops or downgrades hallucinated findings."),
-    ("S5", "s5_policy_gate", "(policy gate)", "Deterministic",
-     "Applies policy: required taint slots, severity floors, allow/deny rules."),
-    ("S6", "s6_adversarial", "adversarial_reviewer", "LLM",
-     "Adversarial refinement, then N-of-M multi-agent voting to kill correlated false positives."),
-    ("S6b", "s6b_validator", "validator", "LLM",
-     "Single-pass precision-filter validator: cheap auto-reject of obvious garbage."),
-    ("S7", "s7_dedupe", "(dedupe)", "Deterministic",
-     "Fingerprint-based de-duplication and local baseline filtering of already-accepted findings."),
-    ("S8", "s8_chain", "exploit_strategist", "LLM",
-     "Links related findings into multi-step attack chains."),
-    ("S8b", "s8b_poc", "poc_gate", "LLM",
-     "Demands a concrete proof-of-concept; demotes (or drops) findings with only hand-wavy PoCs."),
-    ("S8c", "s8c_verify", "(verification)", "Deterministic",
-     "Outcome verification: collapses grounding/taint/PoC/reachability/votes into a single auditable verdict."),
-    ("S9", "s9_emit", "(emitter)", "Deterministic",
-     "Writes Markdown report, SARIF 2.1.0, and feeds the run manifest."),
+    (
+        "S1",
+        "s1_attack_surface",
+        "attack_surface_mapper",
+        "LLM",
+        "Walks the repo, identifies entrypoints, sensitive sinks, auth boundaries; emits the attack-surface map. Owns repo-intake knobs.",
+    ),
+    (
+        "S1b",
+        "s1b_structural",
+        "structural_index",
+        "Deterministic",
+        "Regex + AST ground-truth inventory: routes, sources, sinks, secrets. Folds external scanner reports into the map. Zero LLM cost.",
+    ),
+    (
+        "S2",
+        "s2_threat_model",
+        "threat_modeler",
+        "LLM",
+        "STRIDE/OWASP threat model over the surface + structural evidence. Configurable threat/evidence caps and a threat baseline.",
+    ),
+    (
+        "S3",
+        "s3_strategize",
+        "research_strategist",
+        "LLM",
+        "Chooses which research lenses to spend budget on, guided by the threat model.",
+    ),
+    (
+        "S4",
+        "s4_research",
+        "research_lenses",
+        "LLM",
+        "The core finding generator: language, crypto, logic, access-control and IaC lenses produce candidate findings with taint flow.",
+    ),
+    (
+        "S4b",
+        "s4b_grounding",
+        "(grounding pass)",
+        "Deterministic",
+        "Verifies every cited file path, line number and snippet against real code. Drops or downgrades hallucinated findings.",
+    ),
+    (
+        "S5",
+        "s5_policy_gate",
+        "(policy gate)",
+        "Deterministic",
+        "Applies policy: required taint slots, severity floors, allow/deny rules.",
+    ),
+    (
+        "S6",
+        "s6_adversarial",
+        "adversarial_reviewer",
+        "LLM",
+        "Adversarial refinement, then N-of-M multi-agent voting to kill correlated false positives.",
+    ),
+    (
+        "S6b",
+        "s6b_validator",
+        "validator",
+        "LLM",
+        "Single-pass precision-filter validator: cheap auto-reject of obvious garbage.",
+    ),
+    (
+        "S7",
+        "s7_dedupe",
+        "(dedupe)",
+        "Deterministic",
+        "Fingerprint-based de-duplication and local baseline filtering of already-accepted findings.",
+    ),
+    (
+        "S8",
+        "s8_chain",
+        "exploit_strategist",
+        "LLM",
+        "Links related findings into multi-step attack chains.",
+    ),
+    (
+        "S8b",
+        "s8b_poc",
+        "poc_gate",
+        "LLM",
+        "Demands a concrete proof-of-concept; demotes (or drops) findings with only hand-wavy PoCs.",
+    ),
+    (
+        "S8c",
+        "s8c_verify",
+        "(verification)",
+        "Deterministic",
+        "Outcome verification: collapses grounding/taint/PoC/reachability/votes into a single auditable verdict.",
+    ),
+    (
+        "S9",
+        "s9_emit",
+        "(emitter)",
+        "Deterministic",
+        "Writes Markdown report, SARIF 2.1.0, and feeds the run manifest.",
+    ),
 ]
 
 DETERMINISTIC_CHECKS = [
@@ -174,7 +250,10 @@ S2_KNOBS = [
     ("baseline", "Path to accepted-threat signatures (category|asset) to subtract."),
     ("max_document_chars", "Cap the attack-surface document fed into the prompt."),
     ("max_modules / max_entry_points", "Evidence caps: modules and entry points injected."),
-    ("max_config_reps / max_api_artifacts", "Evidence caps: config reps and API artifacts injected."),
+    (
+        "max_config_reps / max_api_artifacts",
+        "Evidence caps: config reps and API artifacts injected.",
+    ),
 ]
 
 BACKENDS = [
@@ -191,7 +270,10 @@ CLI_COMMANDS = [
     ("redeye scan", "Run the full 9-stage pipeline against one or many repos."),
     ("redeye estimate", "Print scope and approximate USD cost. No LLM calls."),
     ("redeye doctor", "Verify credentials and backend reachability for a profile."),
-    ("redeye setup / init", "Interactive setup; detect creds, pick a profile, write .env / config.yaml."),
+    (
+        "redeye setup / init",
+        "Interactive setup; detect creds, pick a profile, write .env / config.yaml.",
+    ),
     ("redeye baseline", "accept / list / remove findings so they don't reappear."),
     ("redeye collect-feedback", "Ingest TP/FP marks from a PR comment into the feedback store."),
 ]
@@ -200,21 +282,42 @@ SCAN_FLAGS = [
     ("--repo / --repo-file", "Single repo or CSV batch."),
     ("--profile / --preset", "Cost model + roles; preset = pr|ci|deep|quick one-flag combos."),
     ("--diff-only / --pr-base", "Scan only files changed vs a base ref (PR scans)."),
-    ("--exclude-path / --exclude-dir / --exclude-ext / --exclude-glob", "Intake exclusions (merged with config.yaml)."),
-    ("--max-files / --max-file-bytes / --max-file-kb / --max-total-bytes", "DoS / cost limits on intake."),
+    (
+        "--exclude-path / --exclude-dir / --exclude-ext / --exclude-glob",
+        "Intake exclusions (merged with config.yaml).",
+    ),
+    (
+        "--max-files / --max-file-bytes / --max-file-kb / --max-total-bytes",
+        "DoS / cost limits on intake.",
+    ),
     ("--follow-symlinks / --dedupe-configs", "Symlink traversal; config-file de-duplication."),
-    ("--external-scan PATH", "Fold a SARIF/Semgrep/generic-JSON scanner report into the map (repeatable)."),
+    (
+        "--external-scan PATH",
+        "Fold a SARIF/Semgrep/generic-JSON scanner report into the map (repeatable).",
+    ),
     ("--strict-grounding / --require-poc", "Drop (vs downgrade) ungrounded / PoC-less findings."),
     ("--store-findings / --use-feedback", "Persist to and reuse the local feedback DB."),
-    ("--pr-comment / --webhook-url", "Emit a PR-comment Markdown; post a summary to Slack/Teams/Discord."),
+    (
+        "--pr-comment / --webhook-url",
+        "Emit a PR-comment Markdown; post a summary to Slack/Teams/Discord.",
+    ),
 ]
 
 OUTPUTS = [
-    ("Markdown report", "Human-readable findings, quality metrics, structural inventory, external-scanner summary."),
+    (
+        "Markdown report",
+        "Human-readable findings, quality metrics, structural inventory, external-scanner summary.",
+    ),
     ("SARIF 2.1.0", "Canonical machine output for code-scanning integrations."),
-    ("run_manifest.json", "Full audit record: every stage, artifacts, cost, hallucination metrics."),
+    (
+        "run_manifest.json",
+        "Full audit record: every stage, artifacts, cost, hallucination metrics.",
+    ),
     ("PR comment", "GitHub-shaped Markdown for CI gating with TP/FP checkboxes."),
-    ("PDF (this toolchain)", "Styled per-scan report (build_report_pdf.py) and this capability doc."),
+    (
+        "PDF (this toolchain)",
+        "Styled per-scan report (build_report_pdf.py) and this capability doc.",
+    ),
 ]
 
 
@@ -242,7 +345,10 @@ def build(output: Path) -> None:
                 ("Tool", f"redeye {REDEYE_VERSION}"),
                 ("Category", "Agentic SAST harness for autonomous vulnerability discovery"),
                 ("Output", "SARIF 2.1.0 + Markdown + JSON manifest + PDF"),
-                ("Backends", "Anthropic (CLI/SDK), OpenAI-compatible, AWS Bedrock, Google Vertex, Ollama"),
+                (
+                    "Backends",
+                    "Anthropic (CLI/SDK), OpenAI-compatible, AWS Bedrock, Google Vertex, Ollama",
+                ),
                 ("Generated", now),
             ]
         )

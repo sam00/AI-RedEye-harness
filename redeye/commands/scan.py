@@ -255,9 +255,7 @@ def run(
             from redeye.incremental import changed_files, load_prior_hashes
 
             prior_path = (
-                Path(incremental_from)
-                if incremental_from
-                else target_out / "run_manifest.json"
+                Path(incremental_from) if incremental_from else target_out / "run_manifest.json"
             )
             prior = load_prior_hashes(prior_path)
             changed, file_hashes = changed_files(target_path, scope.files, prior)

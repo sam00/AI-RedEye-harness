@@ -257,7 +257,9 @@ def _parse_semgrep(data: dict) -> list[ExternalFinding]:
                 message=str(extra.get("message", "")),
                 path=_norm_path(str(r.get("path", ""))),
                 start_line=int((r.get("start") or {}).get("line", 1) or 1),
-                end_line=int((r.get("end") or {}).get("line")) if (r.get("end") or {}).get("line") else None,
+                end_line=int((r.get("end") or {}).get("line"))
+                if (r.get("end") or {}).get("line")
+                else None,
                 severity=_norm_severity(extra.get("severity")),
                 cwe=_cwe_from_tags(meta.get("cwe")),
             )
@@ -291,7 +293,11 @@ def _parse_generic(rows: list, tool_default: str) -> list[ExternalFinding]:
             ExternalFinding(
                 tool=str(r.get("tool") or tool_default),
                 rule_id=str(
-                    r.get("rule_id") or r.get("rule") or r.get("check_id") or r.get("id") or "unknown"
+                    r.get("rule_id")
+                    or r.get("rule")
+                    or r.get("check_id")
+                    or r.get("id")
+                    or "unknown"
                 ),
                 message=str(r.get("message") or r.get("description") or r.get("title") or ""),
                 path=_norm_path(str(path)),

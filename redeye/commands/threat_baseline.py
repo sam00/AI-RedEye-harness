@@ -72,7 +72,9 @@ def accept(
     return 0
 
 
-def list_entries(*, console: Console, file: Path | None = None, target_root: Path | None = None) -> int:
+def list_entries(
+    *, console: Console, file: Path | None = None, target_root: Path | None = None
+) -> int:
     root = (file or target_root or resolve_threat_baseline_root()).resolve()
     baseline = ThreatBaseline.load(root)
     if not baseline.entries:

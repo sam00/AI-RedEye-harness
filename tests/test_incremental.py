@@ -45,8 +45,16 @@ def test_incremental_scan_records_hashes_and_skips(tiny_repo: Path) -> None:
     # First incremental run: no prior -> full scan, records file_hashes.
     rc1 = runner.invoke(
         main,
-        ["scan", "--repo", str(tiny_repo), "--profile", "mock",
-         "--incremental", "--output-dir", str(out)],
+        [
+            "scan",
+            "--repo",
+            str(tiny_repo),
+            "--profile",
+            "mock",
+            "--incremental",
+            "--output-dir",
+            str(out),
+        ],
     )
     assert rc1.exit_code == 0, rc1.output
     manifest = json.loads((out / "run_manifest.json").read_text(encoding="utf-8"))
@@ -55,8 +63,16 @@ def test_incremental_scan_records_hashes_and_skips(tiny_repo: Path) -> None:
     # Second incremental run: nothing changed -> 0 files changed reported.
     rc2 = runner.invoke(
         main,
-        ["scan", "--repo", str(tiny_repo), "--profile", "mock",
-         "--incremental", "--output-dir", str(out)],
+        [
+            "scan",
+            "--repo",
+            str(tiny_repo),
+            "--profile",
+            "mock",
+            "--incremental",
+            "--output-dir",
+            str(out),
+        ],
     )
     assert rc2.exit_code == 0, rc2.output
     assert "0/" in rc2.output or "changed" in rc2.output

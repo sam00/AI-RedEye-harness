@@ -44,9 +44,7 @@ def test_max_threats_caps_output(tmp_path: Path) -> None:
 
 def test_baseline_subtracts_accepted(tmp_path: Path) -> None:
     baseline = tmp_path / "threats.yaml"
-    baseline.write_text(
-        "accepted:\n  - {category: Spoofing, asset: login}\n", encoding="utf-8"
-    )
+    baseline.write_text("accepted:\n  - {category: Spoofing, asset: login}\n", encoding="utf-8")
     stride = [
         {"category": "Spoofing", "asset": "login"},
         {"category": "Tampering", "asset": "db"},
@@ -86,7 +84,12 @@ def test_evidence_caps_limit_prompt() -> None:
 
 def test_evidence_injected_into_prompt(tmp_path: Path) -> None:
     backend = _make([{"category": "S", "asset": "a"}])
-    index = {"routes": [{"path": "app.py", "snippet": "/login"}], "secrets": [], "sources": [], "sinks": []}
+    index = {
+        "routes": [{"path": "app.py", "snippet": "/login"}],
+        "secrets": [],
+        "sources": [],
+        "sinks": [],
+    }
     build_threat_model(
         target=tmp_path,
         attack_surface={"entrypoints": ["/login"]},

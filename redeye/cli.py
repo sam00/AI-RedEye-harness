@@ -608,9 +608,7 @@ def threat_baseline_list(ctx: click.Context, file: str | None) -> None:
 @click.option("--asset", required=True, help="Asset the threat targets.")
 @click.option("--file", type=click.Path(dir_okay=False), default=None, help="Threat-baseline file.")
 @click.pass_context
-def threat_baseline_remove(
-    ctx: click.Context, category: str, asset: str, file: str | None
-) -> None:
+def threat_baseline_remove(ctx: click.Context, category: str, asset: str, file: str | None) -> None:
     """Remove an accepted threat by category + asset."""
     from redeye.commands.threat_baseline import remove as run_remove
 

@@ -39,8 +39,16 @@ def test_cli_accept_list(tmp_path: Path) -> None:
     runner = CliRunner()
     rc = runner.invoke(
         main,
-        ["threat-baseline", "accept", "--category", "Spoofing", "--asset", "login",
-         "--file", str(f)],
+        [
+            "threat-baseline",
+            "accept",
+            "--category",
+            "Spoofing",
+            "--asset",
+            "login",
+            "--file",
+            str(f),
+        ],
     )
     assert rc.exit_code == 0, rc.output
     assert f.is_file()

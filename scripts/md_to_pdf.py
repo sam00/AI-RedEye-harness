@@ -3,6 +3,7 @@
 
 Usage: python3 md_to_pdf.py <input.md> <output.pdf>
 """
+
 import sys
 
 import markdown
@@ -43,6 +44,7 @@ a { color: #b00020; }
 hr { border-top: 1px solid #dddddd; }
 """
 
+
 def main() -> int:
     src, dst = sys.argv[1], sys.argv[2]
     with open(src, encoding="utf-8") as fh:
@@ -67,6 +69,7 @@ def main() -> int:
         print(f"xhtml2pdf reported {result.err} error(s)", file=sys.stderr)
         return 1
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

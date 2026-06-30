@@ -78,10 +78,12 @@ def test_scan_external_scan_flag_and_report(tiny_repo: Path) -> None:
                         "level": "error",
                         "message": {"text": "sqli"},
                         "locations": [
-                            {"physicalLocation": {
-                                "artifactLocation": {"uri": "src/api/users.py"},
-                                "region": {"startLine": 40},
-                            }}
+                            {
+                                "physicalLocation": {
+                                    "artifactLocation": {"uri": "src/api/users.py"},
+                                    "region": {"startLine": 40},
+                                }
+                            }
                         ],
                     }
                 ],
