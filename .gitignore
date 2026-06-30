@@ -57,6 +57,7 @@ coverage.xml
 Thumbs.db
 
 # Project artifacts
+.redeye/
 .env
 .env.*
 !.env.example

@@ -47,15 +47,43 @@ stages:
     skill: attack_surface_mapper
     role: surveyor
     max_budget_usd: 0.40
+    params:
+      # Repo intake / file-inventory controls (CLI flags still override).
+      exclude_dirs: [migrations, generated, fixtures]
+      exclude_exts: [.min.js, .lock, .map]
+      exclude_globs: ["**/*.snap", "**/testdata/**"]
+      max_file_kb: 512          # skip files larger than 512 KB
+      follow_symlinks: false    # do not traverse symlinks
+      dedupe_configs: true      # collapse byte-identical config files
   s1b_structural:
     # Deterministic regex/AST pre-index. Zero LLM cost; massive precision lift.
     skill: structural_index
     role: surveyor
     max_budget_usd: 0.0
+    params:
+      # Fold third-party scanner reports into the structural map. Accepts
+      # SARIF / Semgrep / Trivy / Bandit / Gitleaks / Grype / generic JSON.
+      # Imported locations are mapping enrichment -- they still face
+      # grounding/voting/verification, are deduped against native sinks at the
+      # same file:line, and flagged reachable when co-located with a source.
+      external_scanners: []
+      # e.g. [./reports/semgrep.json, ./reports/codeql.sarif]
+      # Cap cross-file taint flows from the lightweight Python call graph.
+      max_cross_file_flows: 50
   s2_threat_model:
     skill: threat_modeler
     role: surveyor
     max_budget_usd: 0.40
+    params:
+      enabled: true
+      max_threats: 25           # cap emitted STRIDE entries
+      baseline: null            # path to accepted-threat signatures (category|asset)
+      max_document_chars: 6000  # cap the attack-surface doc fed to the model
+      # Evidence caps -- how much structural context is injected:
+      max_modules: 40
+      max_entry_points: 40
+      max_config_reps: 20
+      max_api_artifacts: 40
   s3_strategize:
     skill: research_strategist
     role: researcher

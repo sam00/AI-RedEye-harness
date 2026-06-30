@@ -1,0 +1,91 @@
+name: "RedEye SAST"
+description: "Run the RedEye agentic SAST harness and emit SARIF for code scanning."
+author: "RedEye"
+branding:
+  icon: "eye"
+  color: "purple"
+
+inputs:
+  repo:
+    description: "Path to the repository to scan."
+    required: false
+    default: "."
+  profile:
+    description: "RedEye profile (default, full, mock, ollama_local, cli)."
+    required: false
+    default: "mock"
+  preset:
+    description: "One-flag preset: pr | ci | deep | quick (overrides profile combos)."
+    required: false
+    default: ""
+  output-dir:
+    description: "Directory for reports (Markdown + SARIF + manifest)."
+    required: false
+    default: "redeye-out"
+  diff-only:
+    description: "Scan only files changed vs the base branch (PR scans)."
+    required: false
+    default: "false"
+  pr-base:
+    description: "Base ref for --diff-only."
+    required: false
+    default: "origin/main"
+  max-cost:
+    description: "Global per-run USD budget (0 = unlimited)."
+    required: false
+    default: "0"
+  extra-args:
+    description: "Additional raw flags appended to the scan command."
+    required: false
+    default: ""
+  upload-sarif:
+    description: "Upload the SARIF to GitHub code scanning."
+    required: false
+    default: "true"
+
+outputs:
+  sarif-path:
+    description: "Path to the emitted SARIF file."
+    value: ${{ steps.scan.outputs.sarif-path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install RedEye
+      shell: bash
+      run: pip install "${{ github.action_path }}"
+
+    - name: Run RedEye scan
+      id: scan
+      shell: bash
+      run: |
+        set -euo pipefail
+        ARGS=(scan --repo "${{ inputs.repo }}" --output-dir "${{ inputs.output-dir }}")
+        if [ -n "${{ inputs.preset }}" ]; then ARGS+=(--preset "${{ inputs.preset }}"); fi
+        ARGS+=(--profile "${{ inputs.profile }}")
+        if [ "${{ inputs.diff-only }}" = "true" ]; then ARGS+=(--diff-only --pr-base "${{ inputs.pr-base }}"); fi
+        if [ "${{ inputs.max-cost }}" != "0" ]; then ARGS+=(--max-cost "${{ inputs.max-cost }}"); fi
+        # shellcheck disable=SC2206
+        ARGS+=(${{ inputs.extra-args }})
+        redeye "${ARGS[@]}"
+        SARIF=$(ls -1 "${{ inputs.output-dir }}"/*.sarif 2>/dev/null | head -n1 || true)
+        echo "sarif-path=${SARIF}" >> "$GITHUB_OUTPUT"
+
+    - name: Upload SARIF to code scanning
+      if: ${{ inputs.upload-sarif == 'true' && steps.scan.outputs.sarif-path != '' }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif-path }}
+
+    - name: Upload reports artifact
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: redeye-reports
+        path: ${{ inputs.output-dir }}
+        if-no-files-found: ignore

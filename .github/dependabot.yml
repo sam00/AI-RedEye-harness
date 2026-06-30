@@ -1,0 +1,26 @@
+version: 2
+updates:
+- package-ecosystem: pip
+  directory: /
+  target-branch: main
+  schedule:
+    interval: daily
+  commit-message:
+    prefix: (security-patch) update
+  pull-request-branch-name:
+    separator: '-'
+  labels:
+  - 'Dependabot: Security'
+  open-pull-requests-limit: 0
+  groups:
+    security-updates:
+      applies-to: security-updates
+      patterns:
+      - '*'
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  allow:
+  - dependency-type: direct
+  - dependency-type: indirect

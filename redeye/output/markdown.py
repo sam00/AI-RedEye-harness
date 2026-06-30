@@ -152,6 +152,8 @@ def write_markdown_report(
     dropped: list[Finding] | None = None,
     hallucination_metrics: dict[str, int] | None = None,
     structural_summary: dict[str, Any] | None = None,
+    external_summary: dict[str, Any] | None = None,
+    redact: bool = True,
 ) -> None:
     dropped = dropped or []
     by_sev = _by_severity(findings)
@@ -219,6 +221,35 @@ def write_markdown_report(
             ]
         )
 
+    if external_summary and external_summary.get("count"):
+        by_tool = external_summary.get("by_tool", {}) or {}
+        lines.extend(
+            [
+                "## External scanner ingestion (S1b)",
+                "",
+                "Third-party scanner findings folded into the structural map as candidate ",
+                "hotspots. These are *mapping enrichment* -- each still had to clear grounding ",
+                "(S4b), voting (S6) and verification (S8c) before reaching the Findings section.",
+                "",
+                f"- **Findings imported:** {external_summary.get('count', 0)}",
+                f"- **Merged as structural hits:** {external_summary.get('hits_added', 0)}",
+                "",
+                "| Tool | Imported |",
+                "|---|---|",
+            ]
+        )
+        for tool, n in sorted(by_tool.items(), key=lambda kv: -kv[1]):
+            lines.append(f"| {tool} | {n} |")
+        sources = external_summary.get("sources", []) or []
+        if sources:
+            lines.append("")
+            lines.append("Sources: " + ", ".join(f"`{s}`" for s in sources))
+        errors = external_summary.get("errors", []) or []
+        if errors:
+            lines.append("")
+            lines.append("**Ingestion errors:** " + "; ".join(str(e) for e in errors))
+        lines.extend(["", "---", ""])
+
     if attack_surface:
         lines.extend(
             [
@@ -280,5 +311,10 @@ def write_markdown_report(
         ]
     )
 
+    report = "\n".join(lines)
+    if redact:
+        from redeye.redaction import redact_secrets
+
+        report = redact_secrets(report)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines), encoding="utf-8")
+    path.write_text(report, encoding="utf-8")

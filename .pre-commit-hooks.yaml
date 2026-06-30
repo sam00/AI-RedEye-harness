@@ -1,0 +1,28 @@
+# Pre-commit hooks provided by RedEye.
+# Consumers add this repo to their .pre-commit-config.yaml, e.g.:
+#
+#   repos:
+#     - repo: https://github.com/sam00/AI-RedEye-harness
+#       rev: v0.3.0
+#       hooks:
+#         - id: redeye-diff-scan
+#
+# The diff-scan hook runs on push (not every commit) so it doesn't slow the
+# inner loop, and uses the mock backend by default (zero LLM cost). Override
+# the backend by setting REDEYE_PROFILE or editing `args`.
+- id: redeye-diff-scan
+  name: RedEye diff scan (changed files only)
+  description: "Run RedEye against files changed vs the upstream branch."
+  entry: redeye scan --diff-only --pr-base origin/main --profile mock --output-dir .redeye-out
+  language: python
+  pass_filenames: false
+  always_run: true
+  stages: [pre-push]
+
+- id: redeye-secrets
+  name: RedEye secret scan (structural, no LLM)
+  description: "Fast deterministic secret/structural pre-index over changed files."
+  entry: redeye estimate --repo .
+  language: python
+  pass_filenames: false
+  stages: [pre-commit]

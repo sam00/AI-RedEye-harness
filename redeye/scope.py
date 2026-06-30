@@ -16,6 +16,8 @@ limits apply consistently.
 
 from __future__ import annotations
 
+import fnmatch
+import hashlib
 import logging
 import os
 import subprocess
@@ -40,6 +42,19 @@ _DEFAULT_IGNORE_DIRS = {
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
+}
+
+# Extensions treated as "config-like" for the optional content-dedupe pass.
+_CONFIG_EXTS = {
+    ".yml",
+    ".yaml",
+    ".json",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".env",
+    ".properties",
 }
 
 _INTERESTING_EXTS = {
@@ -85,11 +100,20 @@ class Scope:
     max_files: int = 0  # 0 = unlimited
     max_file_bytes: int = 0
     max_total_bytes: int = 0
+    # ---- S1 intake knobs (stage-level config.yaml) -------------------
+    exclude_dirs: list[str] = field(default_factory=list)
+    exclude_exts: list[str] = field(default_factory=list)
+    exclude_globs: list[str] = field(default_factory=list)
+    max_file_kb: int = 0  # 0 = unlimited; combined with max_file_bytes (smaller wins)
+    follow_symlinks: bool = False
+    dedupe_configs: bool = False
 
     # Populated by :meth:`build`.
     files: list[Path] = field(default_factory=list)
     skipped_oversize: list[Path] = field(default_factory=list)
     skipped_excluded: list[Path] = field(default_factory=list)
+    skipped_symlinks: list[Path] = field(default_factory=list)
+    skipped_dupe_configs: list[Path] = field(default_factory=list)
     skipped_truncated: int = 0
     total_bytes: int = 0
     diff_files: list[Path] | None = None
@@ -105,6 +129,12 @@ class Scope:
         max_files: int = 0,
         max_file_bytes: int = 0,
         max_total_bytes: int = 0,
+        exclude_dirs: list[str] | None = None,
+        exclude_exts: list[str] | None = None,
+        exclude_globs: list[str] | None = None,
+        max_file_kb: int = 0,
+        follow_symlinks: bool = False,
+        dedupe_configs: bool = False,
     ) -> Scope:
         scope = cls(
             target=target.resolve(),
@@ -114,9 +144,28 @@ class Scope:
             max_files=max_files,
             max_file_bytes=max_file_bytes,
             max_total_bytes=max_total_bytes,
+            exclude_dirs=list(exclude_dirs or []),
+            exclude_exts=[cls._norm_ext(e) for e in (exclude_exts or [])],
+            exclude_globs=list(exclude_globs or []),
+            max_file_kb=max_file_kb,
+            follow_symlinks=follow_symlinks,
+            dedupe_configs=dedupe_configs,
         )
         scope._populate()
         return scope
+
+    @staticmethod
+    def _norm_ext(ext: str) -> str:
+        ext = ext.strip().lower()
+        if ext and not ext.startswith("."):
+            ext = "." + ext
+        return ext
+
+    @property
+    def _effective_max_file_bytes(self) -> int:
+        """Combine max_file_bytes and max_file_kb; the smaller non-zero cap wins."""
+        caps = [c for c in (self.max_file_bytes, self.max_file_kb * 1024) if c > 0]
+        return min(caps) if caps else 0
 
     # -- builders ----------------------------------------------------------
 
@@ -127,19 +176,31 @@ class Scope:
         else:
             candidates = self._walk_files()
 
+        max_bytes = self._effective_max_file_bytes
+        seen_config_hashes: set[str] = set()
         running_total = 0
         for path in candidates:
             rel = self._relative(path)
             if self._is_excluded(rel):
                 self.skipped_excluded.append(path)
                 continue
+            if not self.follow_symlinks and path.is_symlink():
+                self.skipped_symlinks.append(path)
+                continue
             try:
                 size = path.stat().st_size
             except OSError:
                 continue
-            if self.max_file_bytes and size > self.max_file_bytes:
+            if max_bytes and size > max_bytes:
                 self.skipped_oversize.append(path)
                 continue
+            if self.dedupe_configs and path.suffix.lower() in _CONFIG_EXTS:
+                digest = self._content_hash(path)
+                if digest is not None and digest in seen_config_hashes:
+                    self.skipped_dupe_configs.append(path)
+                    continue
+                if digest is not None:
+                    seen_config_hashes.add(digest)
             if self.max_total_bytes and running_total + size > self.max_total_bytes:
                 self.skipped_truncated += 1
                 continue
@@ -150,12 +211,27 @@ class Scope:
             running_total += size
         self.total_bytes = running_total
 
+    @staticmethod
+    def _content_hash(path: Path) -> str | None:
+        try:
+            return hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            return None
+
     def _walk_files(self) -> list[Path]:
         out: list[Path] = []
-        for root, dirs, fnames in os.walk(self.target):
-            dirs[:] = [d for d in dirs if d not in _DEFAULT_IGNORE_DIRS]
+        ignore_dirs = _DEFAULT_IGNORE_DIRS | {d.strip() for d in self.exclude_dirs if d.strip()}
+        exclude_exts = set(self.exclude_exts)
+        for root, dirs, fnames in os.walk(self.target, followlinks=self.follow_symlinks):
+            dirs[:] = [d for d in dirs if d not in ignore_dirs]
             for fname in fnames:
                 p = Path(root) / fname
+                if p.suffix.lower() in exclude_exts:
+                    self.skipped_excluded.append(p)
+                    continue
+                if self._is_glob_excluded(self._relative(p)):
+                    self.skipped_excluded.append(p)
+                    continue
                 if p.suffix.lower() in _INTERESTING_EXTS or p.name in _INTERESTING_EXTS:
                     out.append(p)
         return out
@@ -211,7 +287,17 @@ class Scope:
         for needle in self.exclude_paths:
             if needle.lower() in rel:
                 return True
+        if Path(rel).suffix in self.exclude_exts:
+            return True
+        if self._is_glob_excluded(rel_path):
+            return True
         return False
+
+    def _is_glob_excluded(self, rel_path: str) -> bool:
+        if not self.exclude_globs:
+            return False
+        rel = rel_path.replace("\\", "/")
+        return any(fnmatch.fnmatch(rel, pat) for pat in self.exclude_globs)
 
     # -- public iteration --------------------------------------------------
 
@@ -226,9 +312,17 @@ class Scope:
             "total_bytes": self.total_bytes,
             "skipped_excluded": len(self.skipped_excluded),
             "skipped_oversize": len(self.skipped_oversize),
+            "skipped_symlinks": len(self.skipped_symlinks),
+            "skipped_dupe_configs": len(self.skipped_dupe_configs),
             "skipped_truncated": self.skipped_truncated,
             "exclude_paths": list(self.exclude_paths),
+            "exclude_dirs": list(self.exclude_dirs),
+            "exclude_exts": list(self.exclude_exts),
+            "exclude_globs": list(self.exclude_globs),
             "max_files": self.max_files,
             "max_file_bytes": self.max_file_bytes,
+            "max_file_kb": self.max_file_kb,
             "max_total_bytes": self.max_total_bytes,
+            "follow_symlinks": self.follow_symlinks,
+            "dedupe_configs": self.dedupe_configs,
         }

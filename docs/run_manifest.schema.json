@@ -1,0 +1,728 @@
+{
+  "$defs": {
+    "Evidence": {
+      "description": "One piece of corroboration (or refutation) for a finding.\n\nThe pipeline accumulates these as it runs. A finding is 'grounded' when\nit has at least one ``check == 'pass'`` Evidence whose ``kind`` is\n``file_exists`` *and* one whose ``kind`` is ``snippet_match`` (or\nequivalent ground-truth signal). Findings without grounding evidence\nget their severity capped at ``MEDIUM`` and tagged ``weak-evidence``.",
+      "properties": {
+        "check": {
+          "description": "pass | fail | unknown",
+          "title": "Check",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Detail",
+          "type": "string"
+        },
+        "kind": {
+          "description": "file_exists | line_resolves | snippet_match | structural_hit | poc_runnable | reachable",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "check"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Finding": {
+      "description": "A single triage candidate produced by the pipeline.\n\nFindings are immutable once emitted \u2014 stages that ``refine`` a finding\nconstruct a new one with the same ``id`` and a bumped revision count.",
+      "properties": {
+        "attack_chain": {
+          "description": "Ordered narrative of how an attacker reaches the sink.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Attack Chain",
+          "type": "array"
+        },
+        "confidence": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "cvss_score": {
+          "anyOf": [
+            {
+              "maximum": 10.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CVSS v3.1 base score 0-10.",
+          "title": "Cvss Score"
+        },
+        "cvss_vector": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CVSS v3.1 vector string, e.g. CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
+          "title": "Cvss Vector"
+        },
+        "cwe": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "e.g. CWE-89",
+          "title": "Cwe"
+        },
+        "description": {
+          "maxLength": 4000,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "description": "Pass/fail records produced by the grounding pass and other checks.",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "grounded": {
+          "default": false,
+          "description": "True iff S4b grounding pass verified file + line + snippet.",
+          "title": "Grounded",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "Stable per-run id (e.g. F-0001).",
+          "title": "Id",
+          "type": "string"
+        },
+        "locations": {
+          "items": {
+            "$ref": "#/$defs/Location"
+          },
+          "minItems": 1,
+          "title": "Locations",
+          "type": "array"
+        },
+        "poc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProofOfConcept"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Concrete exploit demonstration (S8b)."
+        },
+        "reachability": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "0..1 -- can an external entrypoint reach this sink? (None = not computed)",
+          "title": "Reachability"
+        },
+        "remediation": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Remediation",
+          "type": "string"
+        },
+        "revision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "skill": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Producing skill name.",
+          "title": "Skill"
+        },
+        "stage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Producing stage id.",
+          "title": "Stage"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "taint": {
+          "$ref": "#/$defs/TaintFlow"
+        },
+        "title": {
+          "maxLength": 200,
+          "title": "Title",
+          "type": "string"
+        },
+        "validator_rationale": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Validator Rationale"
+        },
+        "validator_verdict": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "confirm | reject | uncertain (single-pass S6.5 validator).",
+          "title": "Validator Verdict"
+        },
+        "verification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VerificationResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Outcome-verification verdict (S8c)."
+        },
+        "votes": {
+          "items": {
+            "$ref": "#/$defs/Vote"
+          },
+          "title": "Votes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "severity",
+        "description"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "Location": {
+      "description": "A single file:line[:end_line] reference attached to a finding.",
+      "properties": {
+        "end_line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Line"
+        },
+        "path": {
+          "description": "Repository-relative POSIX path.",
+          "title": "Path",
+          "type": "string"
+        },
+        "snippet": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "?25 lines of context for human reviewers.",
+          "title": "Snippet"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "start_line"
+      ],
+      "title": "Location",
+      "type": "object"
+    },
+    "ProofOfConcept": {
+      "description": "Concrete demonstration that the finding is exploitable.\n\nA real PoC is a string the operator could paste into curl, a file, or\na request body. A *generic* PoC (\"send a malicious value\") is treated\nas no PoC at all -- this is enforced by :class:`Finding.is_concrete_poc`.",
+      "properties": {
+        "expected_effect": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Expected Effect",
+          "type": "string"
+        },
+        "invocation": {
+          "default": "",
+          "description": "How to deliver the payload (curl line, function call, etc.).",
+          "maxLength": 2000,
+          "title": "Invocation",
+          "type": "string"
+        },
+        "is_concrete": {
+          "default": false,
+          "description": "True only if payload + invocation contain non-placeholder content.",
+          "title": "Is Concrete",
+          "type": "boolean"
+        },
+        "payload": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Payload",
+          "type": "string"
+        }
+      },
+      "title": "ProofOfConcept",
+      "type": "object"
+    },
+    "Severity": {
+      "description": "SARIF-aligned severity ordering.\n\nThe string values match the SARIF ``level`` vocabulary so the SARIF\nemitter can pass them through verbatim.",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "informational"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "StageResult": {
+      "description": "The output of one pipeline stage.",
+      "properties": {
+        "artifacts": {
+          "additionalProperties": true,
+          "title": "Artifacts",
+          "type": "object"
+        },
+        "cost_usd": {
+          "default": 0.0,
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "duration_seconds": {
+          "default": 0.0,
+          "title": "Duration Seconds",
+          "type": "number"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "skill": {
+          "title": "Skill",
+          "type": "string"
+        },
+        "stage_id": {
+          "title": "Stage Id",
+          "type": "string"
+        },
+        "tokens_in": {
+          "default": 0,
+          "title": "Tokens In",
+          "type": "integer"
+        },
+        "tokens_out": {
+          "default": 0,
+          "title": "Tokens Out",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stage_id",
+        "skill"
+      ],
+      "title": "StageResult",
+      "type": "object"
+    },
+    "TaintFlow": {
+      "description": "The shape every research-lens finding must fill in.\n\nA vulnerability without a *source*, a *sink*, and a path between them is\na vibe, not a finding. Forcing the lens to declare these three slots\nexplicitly is the single biggest hallucination reducer in this harness:\nif the model can't name them, it shouldn't be writing the finding.",
+      "properties": {
+        "sanitizer_missing": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "True if the lens claims no sanitizer is present on the path.",
+          "title": "Sanitizer Missing"
+        },
+        "sanitizers_observed": {
+          "description": "Sanitizers the lens *did* see on the path (helps disprove FPs).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Sanitizers Observed",
+          "type": "array"
+        },
+        "sink": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The dangerous operation (e.g. 'db.execute(...)' or 'subprocess.run(...)').",
+          "title": "Sink"
+        },
+        "sink_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Location"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Concrete file:line for the sink."
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Where attacker-controlled data enters (e.g. 'request.json[\"username\"]').",
+          "title": "Source"
+        },
+        "source_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Location"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Concrete file:line for the source."
+        },
+        "taint_path": {
+          "description": "Ordered list of locations the data flows through, source to sink.",
+          "items": {
+            "$ref": "#/$defs/Location"
+          },
+          "title": "Taint Path",
+          "type": "array"
+        }
+      },
+      "title": "TaintFlow",
+      "type": "object"
+    },
+    "VerificationResult": {
+      "description": "Final outcome-verification verdict for a finding (stage S8c).\n\nCollapses the independent signals earlier stages already gathered\n(grounding, taint completeness, concrete PoC, reachability, voter\nagreement) into a single auditable verdict. Deterministic by default,\nso it works identically on every backend -- including ones that reject\n``temperature`` (Opus / cli) where multi-agent voting is a no-op.",
+      "properties": {
+        "agreement": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fraction of self-consistency samples that confirmed.",
+          "title": "Agreement"
+        },
+        "method": {
+          "default": "deterministic",
+          "description": "deterministic | self_consistency",
+          "title": "Method",
+          "type": "string"
+        },
+        "rationale": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "samples": {
+          "default": 0,
+          "description": "Self-consistency samples taken (0 = none).",
+          "minimum": 0,
+          "title": "Samples",
+          "type": "integer"
+        },
+        "score": {
+          "default": 0.0,
+          "description": "signals_passed / signals_considered",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "signals": {
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "description": "Per-signal pass/fail (grounded, taint_complete, concrete_poc, reachable, vote_confirmed).",
+          "title": "Signals",
+          "type": "object"
+        },
+        "threshold": {
+          "default": 3,
+          "description": "K independent signals required for verified=True.",
+          "minimum": 1,
+          "title": "Threshold",
+          "type": "integer"
+        },
+        "verified": {
+          "default": false,
+          "title": "Verified",
+          "type": "boolean"
+        }
+      },
+      "title": "VerificationResult",
+      "type": "object"
+    },
+    "Vote": {
+      "description": "One model's vote on a candidate finding (used during S6 voting).",
+      "properties": {
+        "model": {
+          "description": "Concrete model identifier.",
+          "title": "Model",
+          "type": "string"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "role": {
+          "description": "Logical role name from the profile.",
+          "title": "Role",
+          "type": "string"
+        },
+        "verdict": {
+          "description": "confirm | reject | uncertain",
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "model",
+        "verdict",
+        "rationale"
+      ],
+      "title": "Vote",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Audit record written next to every scan output.",
+  "properties": {
+    "application_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Application Id"
+    },
+    "budget_exceeded": {
+      "default": false,
+      "description": "True if the run hit the global budget and skipped remaining paid stages.",
+      "title": "Budget Exceeded",
+      "type": "boolean"
+    },
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "dropped_count": {
+      "default": 0,
+      "title": "Dropped Count",
+      "type": "integer"
+    },
+    "ended_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ended At"
+    },
+    "file_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Per-file content hashes (relative path -> sha256) for the scanned scope. Used by --incremental to skip unchanged files next run.",
+      "title": "File Hashes",
+      "type": "object"
+    },
+    "finding_count": {
+      "default": 0,
+      "title": "Finding Count",
+      "type": "integer"
+    },
+    "hallucination_metrics": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "description": "Counters surfaced by the grounding and PoC stages. Keys: raw_lens, ungrounded_dropped, ungrounded_downgraded, missing_poc, missing_taint, validator_rejected, voted_out.",
+      "title": "Hallucination Metrics",
+      "type": "object"
+    },
+    "max_budget_usd": {
+      "default": 0.0,
+      "description": "Global per-run budget ceiling (0 = unlimited).",
+      "title": "Max Budget Usd",
+      "type": "number"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "stages": {
+      "items": {
+        "$ref": "#/$defs/StageResult"
+      },
+      "title": "Stages",
+      "type": "array"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "target_repo": {
+      "title": "Target Repo",
+      "type": "string"
+    },
+    "target_sha": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Sha"
+    },
+    "tool": {
+      "default": "redeye",
+      "title": "Tool",
+      "type": "string"
+    },
+    "total_cost_usd": {
+      "default": 0.0,
+      "title": "Total Cost Usd",
+      "type": "number"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version",
+    "started_at",
+    "profile",
+    "config_hash",
+    "target_repo"
+  ],
+  "title": "RedEye run_manifest.json",
+  "type": "object"
+}

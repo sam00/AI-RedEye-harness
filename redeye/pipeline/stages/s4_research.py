@@ -170,11 +170,23 @@ def run(ctx) -> StageResult:  # type: ignore[no-untyped-def]
     for s in skipped:
         per_lens_count[f"{s}:skipped"] = 0
 
+    # --- Confidence calibration from reviewer feedback (no LLM cost) -------
+    # Learn per-CWE / per-lens reliability from prior TP/FP marks and nudge
+    # confidence so historically-noisy categories sit lower (and may fall
+    # below the voting threshold) while reliable ones get a boost.
+    from redeye.calibration import calibrate_findings
+
+    calib_metrics = calibrate_findings(findings, ctx.feedback)
+
     return StageResult(
         stage_id=ctx.stage_id,
         skill=stage_cfg.skill,
         findings=findings,
-        artifacts={"per_lens_count": per_lens_count, "lenses_skipped": skipped},
+        artifacts={
+            "per_lens_count": per_lens_count,
+            "lenses_skipped": skipped,
+            "calibration": calib_metrics,
+        },
         tokens_in=total_in,
         tokens_out=total_out,
         cost_usd=total_cost,

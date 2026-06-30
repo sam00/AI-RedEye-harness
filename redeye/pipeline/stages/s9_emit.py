@@ -30,6 +30,7 @@ def run(ctx) -> StageResult:  # type: ignore[no-untyped-def]
         threat_model=ctx.artifacts.get("threat_model", {}),
         hallucination_metrics=ctx.artifacts.get("_hallucination_metrics") or {},
         structural_summary=ctx.artifacts.get("structural_summary"),
+        external_summary=ctx.artifacts.get("external_summary"),
     )
     write_sarif(path=sarif_path, target=ctx.target, findings=ctx.findings)
 

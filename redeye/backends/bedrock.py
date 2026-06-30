@@ -44,11 +44,14 @@ class BedrockBackend(BackendBase):
         # boto3's chain handles env vars, ~/.aws/, IAM role, SSO. We surface
         # the simple cases here for `doctor`; absence of explicit env vars
         # doesn't mean failure (an EC2 instance role would still work).
+        creds = os.path.expanduser("~/.aws/credentials")
+        config = os.path.expanduser("~/.aws/config")
         return bool(
             os.environ.get("AWS_ACCESS_KEY_ID")
             or os.environ.get("AWS_SESSION_TOKEN")
             or os.environ.get("AWS_PROFILE")
-            or os.path.expanduser("~/.aws/credentials")
+            or os.path.isfile(creds)
+            or os.path.isfile(config)
         )
 
     def _get_client(self) -> Any | None:

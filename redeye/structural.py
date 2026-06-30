@@ -295,6 +295,13 @@ class StructuralHit:
     pattern_id: str
     snippet: str
     cwe_hint: str | None = None
+    # True when this sink lives in a file that also contains an untrusted-input
+    # source (cheap co-location heuristic). Lenses + grounding treat a
+    # reachable sink as a higher-priority candidate.
+    reachable_from_source: bool = False
+    # Set when an external scanner already flagged this exact location, or when
+    # a native hit is corroborated by an external scanner. Purely informational.
+    corroborated_by: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         d = {
@@ -306,6 +313,10 @@ class StructuralHit:
         }
         if self.cwe_hint:
             d["cwe"] = self.cwe_hint
+        if self.reachable_from_source:
+            d["reachable_from_source"] = True
+        if self.corroborated_by:
+            d["corroborated_by"] = list(self.corroborated_by)
         return d
 
 
@@ -317,17 +328,22 @@ class StructuralIndex:
     sources: list[StructuralHit] = field(default_factory=list)
     sinks: list[StructuralHit] = field(default_factory=list)
     secrets: list[StructuralHit] = field(default_factory=list)
+    # Cross-file source->sink flows from the lightweight call graph (S1b).
+    cross_file_flows: list[dict[str, Any]] = field(default_factory=list)
     files_indexed: int = 0
 
     def to_compact_dict(self, *, max_per_kind: int = 40) -> dict[str, Any]:
         """Compact view suitable for prompts (truncated to fit)."""
-        return {
+        d = {
             "routes": [h.to_dict() for h in self.routes[:max_per_kind]],
             "sources": [h.to_dict() for h in self.sources[:max_per_kind]],
             "sinks": [h.to_dict() for h in self.sinks[:max_per_kind]],
             "secrets": [h.to_dict() for h in self.secrets[:max_per_kind]],
             "files_indexed": self.files_indexed,
         }
+        if self.cross_file_flows:
+            d["cross_file_flows"] = self.cross_file_flows[:max_per_kind]
+        return d
 
     @property
     def total_hits(self) -> int:
@@ -400,6 +416,81 @@ def build_index(*, target: Path, file_paths: list[Path]) -> StructuralIndex:
                     )
         idx.files_indexed += 1
     return idx
+
+
+def merge_external_findings(index: StructuralIndex, findings: list[Any]) -> dict[str, int]:
+    """Fold third-party scanner findings into the index as ``sink`` hits.
+
+    Each :class:`redeye.external.ExternalFinding` becomes a structural hit at
+    its cited file:line so the lenses and threat model treat it as a real,
+    already-flagged hotspot. This is *mapping enrichment* -- the imported
+    location still has to clear grounding / voting / verification like any
+    other candidate; it is never promoted straight to the report.
+
+    Two enrichments make the imported signal more useful:
+
+    - **Dedupe external-vs-native.** If a native sink already sits at the same
+      ``file:line`` we don't add a duplicate; instead we corroborate the
+      existing hit (record the external tool, fill a missing CWE hint). External
+      findings duplicated across reports collapse to one hit too.
+    - **Reachability boost.** A sink in a file that also contains an
+      untrusted-input source is flagged ``reachable_from_source`` so it enters
+      S4b grounding (and the lenses' attention) with a head start.
+
+    Returns counts: ``{"added", "deduped", "reachable", "corroborated"}``.
+    """
+    # Files that contain an untrusted-input source (cheap co-location signal).
+    source_files = {h.path for h in index.sources} | {h.path for h in index.routes}
+    # Existing sink locations -> hit, for dedupe + corroboration.
+    sink_at: dict[tuple[str, int], StructuralHit] = {(h.path, h.line): h for h in index.sinks}
+
+    added = deduped = reachable = corroborated = 0
+    for f in findings:
+        path = _norm_external_path(getattr(f, "path", ""))
+        line = int(getattr(f, "start_line", 1) or 1)
+        tool = getattr(f, "tool", "scanner") or "scanner"
+        rule = getattr(f, "rule_id", "rule") or "rule"
+        cwe = getattr(f, "cwe", None)
+        key = (path, line)
+
+        existing = sink_at.get(key)
+        if existing is not None:
+            # Dedupe: corroborate the co-located hit rather than duplicate it.
+            deduped += 1
+            tag = f"{tool}:{rule}"
+            if tag not in existing.corroborated_by:
+                existing.corroborated_by.append(tag)
+                corroborated += 1
+            if not existing.cwe_hint and cwe:
+                existing.cwe_hint = cwe
+            continue
+
+        is_reachable = path in source_files
+        hit = StructuralHit(
+            path=path,
+            line=line,
+            kind=f"external:{tool}:{rule}",
+            pattern_id="external_scanner",
+            snippet=(getattr(f, "message", "") or "")[:240],
+            cwe_hint=cwe,
+            reachable_from_source=is_reachable,
+            corroborated_by=[f"{tool}:{rule}"],
+        )
+        index.sinks.append(hit)
+        sink_at[key] = hit
+        added += 1
+        if is_reachable:
+            reachable += 1
+    return {
+        "added": added,
+        "deduped": deduped,
+        "reachable": reachable,
+        "corroborated": corroborated,
+    }
+
+
+def _norm_external_path(raw: str) -> str:
+    return (raw or "").replace("\\", "/").lstrip("./")
 
 
 # Signals that a file builds a query/path from untrusted input (file-level

@@ -33,7 +33,7 @@ harness can run.
 **60-second quickstart.** No API keys, deterministic mock backend — full steps
 in [Quickstart](#quickstart-60-seconds-zero-llm-cost) just below:
 ```bash
-git clone https://github.com/sam00/AI-RedEye-Harness.git redeye && cd redeye
+git clone git@github.com:sam00/AI-RedEye-harness.git redeye && cd redeye
 make install && make demo      # writes ./out/*.md + *.sarif, zero LLM cost
 ```
 
@@ -96,7 +96,7 @@ RedEye started from the open-source ideas in Visa's **[Vulnerability Agentic Har
 ## Quickstart (60 seconds, zero LLM cost)
 
 ```bash
-git clone https://github.com/sam00/AI-RedEye-Harness.git redeye
+git clone git@github.com:sam00/AI-RedEye-harness.git redeye
 cd redeye
 make install           # python3 -m venv + pip install -e ".[dev]"
 make demo              # mock-backend scan against ./, writes ./out/*.md + .sarif

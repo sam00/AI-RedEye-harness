@@ -51,6 +51,48 @@ def _resolve_targets(repo: Path | None, repo_file: Path | None) -> list[tuple[Pa
     raise ConfigError("Either --repo or --repo-file must be provided.")
 
 
+def _merge_list(cli_list, cfg_list) -> list:  # type: ignore[no-untyped-def]
+    """Union of config + CLI list values, preserving order, de-duplicated."""
+    out: list = []
+    for item in list(cfg_list or []) + list(cli_list or []):
+        if item not in out:
+            out.append(item)
+    return out
+
+
+def _scope_kwargs(cfg, *, cli: dict) -> dict:  # type: ignore[no-untyped-def]
+    """Merge S1 intake config (config.yaml) with CLI flags.
+
+    The ``s1_attack_surface`` stage owns repo intake / file-inventory knobs.
+    Scalar CLI flags win when explicitly provided (non-falsy); list flags are
+    merged (union) with the stage params so config sets a baseline the CLI
+    can extend.
+    """
+    s1 = cfg.stages.get("s1_attack_surface")
+    params = dict(s1.params) if s1 is not None else {}
+
+    def pick(key: str, default):
+        # Scalar: CLI value wins if the user supplied a non-falsy one.
+        cli_val = cli.get(key)
+        if cli_val:
+            return cli_val
+        return params.get(key, default)
+
+    return {
+        "exclude_paths": _merge_list(cli.get("exclude_paths"), params.get("exclude_paths")),
+        "max_files": pick("max_files", 0),
+        "max_file_bytes": pick("max_file_bytes", 0),
+        "max_total_bytes": pick("max_total_bytes", 0),
+        "exclude_dirs": _merge_list(cli.get("exclude_dirs"), params.get("exclude_dirs")),
+        "exclude_exts": _merge_list(cli.get("exclude_exts"), params.get("exclude_exts")),
+        "exclude_globs": _merge_list(cli.get("exclude_globs"), params.get("exclude_globs")),
+        "max_file_kb": int(pick("max_file_kb", 0) or 0),
+        # Boolean flags: CLI True overrides; otherwise fall back to config.
+        "follow_symlinks": bool(cli.get("follow_symlinks") or params.get("follow_symlinks", False)),
+        "dedupe_configs": bool(cli.get("dedupe_configs") or params.get("dedupe_configs", False)),
+    }
+
+
 def _load_custom_prompt(path: Path | None) -> str:
     if path is None:
         return ""
@@ -118,6 +160,12 @@ def run(
     max_files: int = 0,
     max_file_bytes: int = 0,
     max_total_bytes: int = 0,
+    exclude_dirs: list[str] | None = None,
+    exclude_exts: list[str] | None = None,
+    exclude_globs: list[str] | None = None,
+    max_file_kb: int = 0,
+    follow_symlinks: bool = False,
+    dedupe_configs: bool = False,
     custom_prompt_file: Path | None = None,
     store_findings: bool = False,
     use_feedback: bool = False,
@@ -126,6 +174,12 @@ def run(
     webhook_type: str = "generic",
     strict_grounding: bool = False,
     require_poc: bool = False,
+    external_scans: list[str] | None = None,
+    emit_pdf: bool = False,
+    emit_html: bool = False,
+    max_cost: float = 0.0,
+    incremental: bool = False,
+    incremental_from: str | None = None,
 ) -> int:
     cfg = load_profile(profile)
     # Honor --strict-grounding / --require-poc by patching the stage params
@@ -166,14 +220,26 @@ def run(
             + (f"  [dim]appId={effective_app_id}[/dim]" if effective_app_id else "")
         )
 
+        scope_kwargs = _scope_kwargs(
+            cfg,
+            cli={
+                "exclude_paths": list(exclude_paths or []),
+                "max_files": max_files,
+                "max_file_bytes": max_file_bytes,
+                "max_total_bytes": max_total_bytes,
+                "exclude_dirs": list(exclude_dirs or []),
+                "exclude_exts": list(exclude_exts or []),
+                "exclude_globs": list(exclude_globs or []),
+                "max_file_kb": max_file_kb,
+                "follow_symlinks": follow_symlinks,
+                "dedupe_configs": dedupe_configs,
+            },
+        )
         scope = Scope.build(
             target=target_path,
             diff_only=diff_only,
             pr_base=pr_base,
-            exclude_paths=exclude_paths or [],
-            max_files=max_files,
-            max_file_bytes=max_file_bytes,
-            max_total_bytes=max_total_bytes,
+            **scope_kwargs,
         )
         if scope.skipped_oversize or scope.skipped_excluded or scope.skipped_truncated:
             console.print(
@@ -182,6 +248,25 @@ def run(
                 f"{len(scope.skipped_oversize)} too large, "
                 f"{scope.skipped_truncated} truncated[/dim]"
             )
+
+        # Incremental: skip files unchanged since a prior run's manifest.
+        file_hashes: dict[str, str] = {}
+        if incremental:
+            from redeye.incremental import changed_files, load_prior_hashes
+
+            prior_path = (
+                Path(incremental_from)
+                if incremental_from
+                else target_out / "run_manifest.json"
+            )
+            prior = load_prior_hashes(prior_path)
+            changed, file_hashes = changed_files(target_path, scope.files, prior)
+            if prior:
+                console.print(
+                    f"  [dim]incremental: {len(changed)}/{len(scope.files)} files changed "
+                    f"since {prior_path.name}[/dim]"
+                )
+            scope.files = changed
 
         feedback = _load_feedback(target_path, use_feedback)
         if feedback:
@@ -198,6 +283,9 @@ def run(
             scope=scope,
             custom_prompt=custom_prompt,
             feedback=feedback,
+            external_scans=list(external_scans or []),
+            file_hashes=file_hashes,
+            max_budget_usd=max_cost,
         )
         try:
             manifest = orchestrator.run()
@@ -212,6 +300,27 @@ def run(
             f"findings={manifest.finding_count} dropped={manifest.dropped_count} "
             f"cost=${manifest.total_cost_usd:.3f}"
         )
+
+        # Optional self-contained HTML + styled PDF, built from the manifest.
+        manifest_path = target_out / "run_manifest.json"
+        if emit_html:
+            from redeye.output.html import render_manifest_html
+
+            html_path = target_out / "report.html"
+            try:
+                render_manifest_html(manifest_path, html_path, target_name=target_path.name)
+                console.print(f"  [dim]wrote HTML: {html_path}[/dim]")
+            except OSError as exc:
+                console.print(f"  [yellow]HTML report failed: {exc}[/yellow]")
+        if emit_pdf:
+            from redeye.output.pdf import PdfUnavailable, render_manifest_pdf
+
+            pdf_path = target_out / "report.pdf"
+            try:
+                render_manifest_pdf(manifest_path, pdf_path, target_name=target_path.name)
+                console.print(f"  [dim]wrote PDF: {pdf_path}[/dim]")
+            except (PdfUnavailable, OSError) as exc:
+                console.print(f"  [yellow]PDF report skipped: {exc}[/yellow]")
 
         # The orchestrator already wrote Markdown + SARIF; we add the PR
         # comment, the optional DB row, and the optional webhook here.

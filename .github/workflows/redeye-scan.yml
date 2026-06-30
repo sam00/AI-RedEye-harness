@@ -21,6 +21,10 @@ permissions:
   pull-requests: write
   issues: write
 
+env:
+  REDEYE_DB_PATH: .redeye/scans.db
+  REDEYE_FEEDBACK_CACHE_KEY: redeye-feedback-v1-${{ github.repository }}
+
 jobs:
   pr-scan:
     if: github.event_name == 'pull_request'
@@ -35,6 +39,14 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+
+      - name: Restore feedback store
+        uses: actions/cache@v4
+        with:
+          path: .redeye/scans.db
+          key: ${{ env.REDEYE_FEEDBACK_CACHE_KEY }}
+          restore-keys: |
+            redeye-feedback-v1-
 
       - name: Install redeye
         run: |
@@ -57,26 +69,19 @@ jobs:
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
           GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
-          REDEYE_DB_PATH: ${{ runner.temp }}/scans.db
           REDEYE_WEBHOOK_URL: ${{ secrets.REDEYE_WEBHOOK_URL }}
           REDEYE_WEBHOOK_TYPE: ${{ vars.REDEYE_WEBHOOK_TYPE || 'slack' }}
         run: |
           if [ -n "${{ secrets.GOOGLE_CREDENTIALS }}" ]; then
             echo '${{ secrets.GOOGLE_CREDENTIALS }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
           fi
-          mkdir -p out
+          mkdir -p out .redeye
           redeye scan \
             --repo . \
-            --diff-only \
+            --preset pr \
             --pr-base "origin/${{ github.event.pull_request.base.ref }}" \
-            --max-files 100 \
-            --max-file-bytes 500000 \
-            --max-total-bytes 5242880 \
-            --exclude-path test --exclude-path vendor --exclude-path node_modules \
             --output-dir ./out \
             --pr-comment ./out/pr-comment.md \
-            --store-findings \
-            --use-feedback \
             ${REDEYE_WEBHOOK_URL:+--webhook-url "$REDEYE_WEBHOOK_URL" --webhook-type "$REDEYE_WEBHOOK_TYPE"}
 
       - name: Post PR comment
@@ -141,13 +146,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Restore feedback store
+        uses: actions/cache@v4
+        with:
+          path: .redeye/scans.db
+          key: ${{ env.REDEYE_FEEDBACK_CACHE_KEY }}
+          restore-keys: |
+            redeye-feedback-v1-
       - run: pip install .
       - name: Persist verdicts
         env:
-          REDEYE_DB_PATH: ${{ runner.temp }}/scans.db
-        shell: bash
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          cat > /tmp/comment.md <<'EOF'
-          ${{ github.event.comment.body }}
-          EOF
+          mkdir -p .redeye
+          python3 -c "import os, pathlib; pathlib.Path('/tmp/comment.md').write_text(os.environ['COMMENT_BODY'])"
           redeye collect-feedback --comment-file /tmp/comment.md

@@ -571,6 +571,47 @@ def main() -> int:
                     )
                 )
 
+    # ---- External scanner ingestion (S1b) ----
+    external_summary = s1b.get("external_summary") or {}
+    if external_summary.get("count"):
+        story.append(Spacer(1, 0.18 * inch))
+        story.append(Paragraph("External scanner ingestion (S1b)", H3))
+        story.append(
+            Paragraph(
+                "Third-party scanner findings (SARIF / Semgrep / generic JSON) folded into the "
+                "structural map as candidate hotspots. This is mapping enrichment -- each still "
+                "had to clear grounding, voting and verification before reaching the findings.",
+                SMALL,
+            )
+        )
+        story.append(Spacer(1, 0.05 * inch))
+        rows = [[Paragraph("<b>Tool</b>", SMALL), Paragraph("<b>Imported</b>", SMALL)]]
+        for tool, n in sorted(
+            (external_summary.get("by_tool") or {}).items(), key=lambda kv: -kv[1]
+        ):
+            rows.append([Paragraph(esc(tool), SMALL), Paragraph(f"<b>{n}</b>", SMALL)])
+        rows.append(
+            [
+                Paragraph("<i>Merged as structural hits</i>", SMALL),
+                Paragraph(f"<b>{external_summary.get('hits_added', 0)}</b>", SMALL),
+            ]
+        )
+        et = Table(rows, colWidths=[4.0 * inch, 1.0 * inch], repeatRows=1)
+        et.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), DARK),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, PALE]),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]
+            )
+        )
+        story.append(et)
+
     story.append(PageBreak())
 
     # ---- Attack surface (S1) and threat model (S2) ----

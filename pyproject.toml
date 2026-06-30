@@ -71,9 +71,9 @@ dev = [
 redeye = "redeye.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/sam00/AI-RedEye-Harness"
-Documentation = "https://github.com/sam00/AI-RedEye-Harness/tree/main/docs"
-Issues = "https://github.com/sam00/AI-RedEye-Harness/issues"
+Homepage = "https://github.com/sam00/AI-RedEye-harness"
+Documentation = "https://github.com/sam00/AI-RedEye-harness/tree/main/docs"
+Issues = "https://github.com/sam00/AI-RedEye-harness/issues"
 
 [tool.setuptools.packages.find]
 include = ["redeye*"]

@@ -65,7 +65,7 @@ def build_sarif_log(*, target: Path, findings: list[Finding]) -> dict:
                 "helpUri": (
                     f"https://cwe.mitre.org/data/definitions/{f.cwe.replace('CWE-', '')}.html"
                     if f.cwe and f.cwe.startswith("CWE-")
-                    else "https://github.com/sam00/AI-RedEye-Harness"
+                    else "https://github.com/sam00/AI-RedEye-harness"
                 ),
                 "properties": {
                     "tags": ["security", *f.tags],
@@ -177,7 +177,7 @@ def build_sarif_log(*, target: Path, findings: list[Finding]) -> dict:
                     "driver": {
                         "name": "redeye",
                         "version": __version__,
-                        "informationUri": "https://github.com/sam00/AI-RedEye-Harness",
+                        "informationUri": "https://github.com/sam00/AI-RedEye-harness",
                         "rules": list(rules.values()),
                     }
                 },

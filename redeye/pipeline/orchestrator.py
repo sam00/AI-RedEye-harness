@@ -44,6 +44,22 @@ from redeye.scope import Scope
 
 log = logging.getLogger(__name__)
 
+
+def _skip_for_budget(
+    *, total_cost: float, stage_budget: float, stage_id: str, max_budget: float
+) -> bool:
+    """Should this stage be skipped because the global budget is exhausted?
+
+    Skips only *paid* stages (``stage_budget > 0``) and never s9_emit, so a
+    report is always produced for whatever survived.
+    """
+    if not max_budget:
+        return False
+    if stage_id == "s9_emit":
+        return False
+    return total_cost >= max_budget and stage_budget > 0
+
+
 _STAGE_ORDER: list[tuple[str, Callable[..., StageResult]]] = [
     ("s1_attack_surface", s1_attack_surface.run),
     ("s1b_structural", s1b_structural.run),  # optional; deterministic, no LLM
@@ -77,6 +93,7 @@ class StageContext:
     scope: Scope | None = None
     custom_prompt: str = ""
     feedback: list[dict[str, Any]] = field(default_factory=list)
+    external_scans: list[str] = field(default_factory=list)
 
     def get_backend(self, role_name: str) -> tuple[BackendBase, str, float | None, int]:
         role = self.profile.roles[role_name]
@@ -98,6 +115,9 @@ class Orchestrator:
         scope: Scope | None = None,
         custom_prompt: str = "",
         feedback: list[dict[str, Any]] | None = None,
+        external_scans: list[str] | None = None,
+        file_hashes: dict[str, str] | None = None,
+        max_budget_usd: float = 0.0,
     ) -> None:
         self.config = config
         self.console = console
@@ -108,6 +128,9 @@ class Orchestrator:
         self.scope = scope
         self.custom_prompt = custom_prompt
         self.feedback = feedback or []
+        self.external_scans = external_scans or []
+        self.file_hashes = file_hashes or {}
+        self.max_budget_usd = max_budget_usd or 0.0
 
     def _resolve_target_sha(self) -> str | None:
         try:
@@ -134,6 +157,8 @@ class Orchestrator:
             target_repo=str(self.target),
             target_sha=self._resolve_target_sha(),
             application_id=self.application_id,
+            file_hashes=self.file_hashes,
+            max_budget_usd=self.max_budget_usd,
         )
 
         ctx = StageContext(
@@ -146,6 +171,7 @@ class Orchestrator:
             scope=self.scope,
             custom_prompt=self.custom_prompt,
             feedback=self.feedback,
+            external_scans=self.external_scans,
         )
 
         all_findings: list[Finding] = []
@@ -155,6 +181,32 @@ class Orchestrator:
             stage_cfg = self.config.stages.get(stage_id)
             if stage_cfg is None:
                 log.info("Stage %s not in profile; skipping.", stage_id)
+                continue
+
+            # Global cost guardrail: once the run hits the budget, skip the
+            # remaining *paid* (LLM) stages but keep running zero-cost
+            # deterministic stages and always reach s9_emit so a report is
+            # still produced for whatever survived.
+            if _skip_for_budget(
+                total_cost=manifest.total_cost_usd,
+                stage_budget=stage_cfg.max_budget_usd,
+                stage_id=stage_id,
+                max_budget=self.max_budget_usd,
+            ):
+                if not manifest.budget_exceeded:
+                    manifest.budget_exceeded = True
+                    self.console.print(
+                        f"  [yellow]budget guardrail tripped[/yellow] "
+                        f"(${manifest.total_cost_usd:.2f} >= ${self.max_budget_usd:.2f}); "
+                        f"skipping remaining paid stages."
+                    )
+                manifest.stages.append(
+                    StageResult(
+                        stage_id=stage_id,
+                        skill=stage_cfg.skill,
+                        error="skipped: global budget exceeded",
+                    )
+                )
                 continue
 
             ctx.stage_id = stage_id

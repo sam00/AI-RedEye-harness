@@ -12,12 +12,21 @@ from redeye.skills.threat_modeler import build_threat_model
 
 def run(ctx) -> StageResult:  # type: ignore[no-untyped-def]
     stage_cfg = ctx.profile.stages[ctx.stage_id]
+
+    # `enabled: false` skips threat modeling entirely (no LLM call).
+    if stage_cfg.params.get("enabled", True) is False:
+        return StageResult(
+            stage_id=ctx.stage_id,
+            skill=stage_cfg.skill,
+            artifacts={"threat_model": {}, "threat_model_skipped": True},
+        )
+
     backend, model, temperature, max_tokens = ctx.get_backend(stage_cfg.role)
 
-    # Pull S1's artifact off the context. Stages pass artifacts via the
-    # orchestrator's running list of stage results, but for this minimal
-    # implementation we re-derive what we need from the target.
+    # S1 attack surface + S1b structural index are read off the running
+    # artifacts the orchestrator propagates forward.
     surface = ctx.artifacts.get("attack_surface", {})
+    structural_index = ctx.artifacts.get("structural_index", {})
 
     model_doc, completion = build_threat_model(
         target=ctx.target,
@@ -27,6 +36,8 @@ def run(ctx) -> StageResult:  # type: ignore[no-untyped-def]
         temperature=temperature,
         max_tokens=max_tokens,
         max_budget_usd=stage_cfg.max_budget_usd,
+        structural_index=structural_index,
+        params=stage_cfg.params,
     )
 
     return StageResult(

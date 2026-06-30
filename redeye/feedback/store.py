@@ -171,7 +171,7 @@ class FindingsStore:
         with closing(self._connect()) as conn:
             rows = conn.execute(
                 """
-                SELECT finding_id, title, severity, cwe, path, reviewer_verdict
+                SELECT finding_id, title, severity, cwe, path, skill, reviewer_verdict
                 FROM findings
                 WHERE repo = ? AND reviewer_verdict IS NOT NULL
                 ORDER BY reviewer_at DESC
@@ -188,6 +188,7 @@ class FindingsStore:
                     "severity": r["severity"],
                     "cwe": r["cwe"],
                     "path": r["path"],
+                    "skill": r["skill"],
                     "verdict": r["reviewer_verdict"],
                 }
             )

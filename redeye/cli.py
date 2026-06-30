@@ -179,6 +179,41 @@ def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
 @click.option(
     "--max-total-bytes", type=int, default=0, help="Stop scanning once cumulative bytes exceed."
 )
+# --- S1 repo-intake / file-inventory knobs (also settable in config.yaml) ---
+@click.option(
+    "--exclude-dir",
+    "exclude_dirs",
+    multiple=True,
+    help="Directory name to skip during intake (repeatable). Merged with config.",
+)
+@click.option(
+    "--exclude-ext",
+    "exclude_exts",
+    multiple=True,
+    help="File extension to skip, dot optional e.g. .min.js (repeatable). Merged with config.",
+)
+@click.option(
+    "--exclude-glob",
+    "exclude_globs",
+    multiple=True,
+    help="fnmatch glob against the relative path to skip (repeatable). Merged with config.",
+)
+@click.option(
+    "--max-file-kb",
+    type=int,
+    default=0,
+    help="Skip files larger than this many KB (combined with --max-file-bytes; smaller wins).",
+)
+@click.option(
+    "--follow-symlinks",
+    is_flag=True,
+    help="Traverse symlinked files/dirs during intake (default: skip symlinks).",
+)
+@click.option(
+    "--dedupe-configs",
+    is_flag=True,
+    help="Drop byte-identical config files (.yaml/.json/.toml/.ini/.env/...) during intake.",
+)
 # --- Customisation / feedback ----------------------------------------------
 @click.option(
     "--custom-prompt-file",
@@ -211,6 +246,53 @@ def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
         "Drop findings that have no concrete PoC after S8b. Default: keep "
         "but downgrade severity by one notch."
     ),
+)
+@click.option(
+    "--external-scan",
+    "external_scans",
+    multiple=True,
+    type=click.Path(exists=True, dir_okay=False),
+    help=(
+        "Path to an external scanner report (SARIF / Semgrep / Trivy / Bandit / "
+        "Gitleaks / Grype / generic JSON) to fold into the structural map "
+        "(repeatable). Imported locations are mapping enrichment -- they still "
+        "face grounding/voting/verification."
+    ),
+)
+@click.option(
+    "--pdf",
+    "emit_pdf",
+    is_flag=True,
+    help="Also render a styled PDF report next to the Markdown/SARIF (needs reportlab).",
+)
+@click.option(
+    "--html",
+    "emit_html",
+    is_flag=True,
+    help="Also render a self-contained interactive HTML report (filter by severity/CWE/grounded).",
+)
+@click.option(
+    "--max-cost",
+    type=float,
+    default=0.0,
+    help=(
+        "Global per-run USD budget. When cumulative spend hits this, remaining "
+        "paid (LLM) stages are skipped but a report is still emitted. 0 = unlimited."
+    ),
+)
+@click.option(
+    "--incremental",
+    is_flag=True,
+    help=(
+        "Skip files unchanged since the prior run's manifest (content-hash "
+        "based). Big speedup on CI re-runs."
+    ),
+)
+@click.option(
+    "--incremental-from",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Prior run_manifest.json to diff against (default: <output-dir>/run_manifest.json).",
 )
 @click.option(
     "--preset",
@@ -261,6 +343,12 @@ def scan(
     max_files: int,
     max_file_bytes: int,
     max_total_bytes: int,
+    exclude_dirs: tuple[str, ...],
+    exclude_exts: tuple[str, ...],
+    exclude_globs: tuple[str, ...],
+    max_file_kb: int,
+    follow_symlinks: bool,
+    dedupe_configs: bool,
     custom_prompt_file: str | None,
     store_findings: bool,
     use_feedback: bool,
@@ -269,6 +357,12 @@ def scan(
     webhook_type: str,
     strict_grounding: bool,
     require_poc: bool,
+    external_scans: tuple[str, ...],
+    emit_pdf: bool,
+    emit_html: bool,
+    max_cost: float,
+    incremental: bool,
+    incremental_from: str | None,
     preset: str | None,
 ) -> None:
     """Run the full 9-stage pipeline against one or more repositories."""
@@ -340,6 +434,12 @@ def scan(
             max_files=max_files,
             max_file_bytes=max_file_bytes,
             max_total_bytes=max_total_bytes,
+            exclude_dirs=list(exclude_dirs),
+            exclude_exts=list(exclude_exts),
+            exclude_globs=list(exclude_globs),
+            max_file_kb=max_file_kb,
+            follow_symlinks=follow_symlinks,
+            dedupe_configs=dedupe_configs,
             custom_prompt_file=Path(custom_prompt_file) if custom_prompt_file else None,
             store_findings=store_findings,
             use_feedback=use_feedback,
@@ -348,6 +448,12 @@ def scan(
             webhook_type=webhook_type,
             strict_grounding=strict_grounding,
             require_poc=require_poc,
+            external_scans=list(external_scans),
+            emit_pdf=emit_pdf,
+            emit_html=emit_html,
+            max_cost=max_cost,
+            incremental=incremental,
+            incremental_from=incremental_from,
         )
         sys.exit(rc)
     except RedEyeError as exc:
@@ -436,6 +542,84 @@ def baseline_remove(ctx: click.Context, fingerprint: str) -> None:
     from redeye.commands.baseline import remove as run_remove
 
     rc = run_remove(console=ctx.obj["console"], fp=fingerprint)
+    sys.exit(rc)
+
+
+@main.group("threat-baseline")
+def threat_baseline_group() -> None:
+    """Manage accepted STRIDE threats (subtracted from future S2 threat models)."""
+
+
+@threat_baseline_group.command("accept")
+@click.option("--category", default=None, help="STRIDE category, e.g. Spoofing.")
+@click.option("--asset", default=None, help="Asset the threat targets, e.g. login.")
+@click.option("--rationale", default="", help="Why this threat was accepted (free text).")
+@click.option(
+    "--manifest",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="run_manifest.json to read the S2 STRIDE list from (with --all).",
+)
+@click.option("--all", "accept_all", is_flag=True, help="Accept every threat in --manifest.")
+@click.option(
+    "--file",
+    type=click.Path(dir_okay=False),
+    default=None,
+    help="Threat-baseline file to write (default: ./.redeye-threat-baseline.yaml).",
+)
+@click.pass_context
+def threat_baseline_accept(
+    ctx: click.Context,
+    category: str | None,
+    asset: str | None,
+    rationale: str,
+    manifest: str | None,
+    accept_all: bool,
+    file: str | None,
+) -> None:
+    """Accept a threat so S2 stops re-emitting it."""
+    from redeye.commands.threat_baseline import accept as run_accept
+
+    rc = run_accept(
+        console=ctx.obj["console"],
+        category=category,
+        asset=asset,
+        rationale=rationale,
+        manifest=Path(manifest) if manifest else None,
+        accept_all=accept_all,
+        file=Path(file) if file else None,
+    )
+    sys.exit(rc)
+
+
+@threat_baseline_group.command("list")
+@click.option("--file", type=click.Path(dir_okay=False), default=None, help="Threat-baseline file.")
+@click.pass_context
+def threat_baseline_list(ctx: click.Context, file: str | None) -> None:
+    """List accepted threats."""
+    from redeye.commands.threat_baseline import list_entries
+
+    rc = list_entries(console=ctx.obj["console"], file=Path(file) if file else None)
+    sys.exit(rc)
+
+
+@threat_baseline_group.command("remove")
+@click.option("--category", required=True, help="STRIDE category.")
+@click.option("--asset", required=True, help="Asset the threat targets.")
+@click.option("--file", type=click.Path(dir_okay=False), default=None, help="Threat-baseline file.")
+@click.pass_context
+def threat_baseline_remove(
+    ctx: click.Context, category: str, asset: str, file: str | None
+) -> None:
+    """Remove an accepted threat by category + asset."""
+    from redeye.commands.threat_baseline import remove as run_remove
+
+    rc = run_remove(
+        console=ctx.obj["console"],
+        category=category,
+        asset=asset,
+        file=Path(file) if file else None,
+    )
     sys.exit(rc)
 
 

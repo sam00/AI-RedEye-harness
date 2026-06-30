@@ -272,3 +272,19 @@ class RunManifest(BaseModel):
             "missing_taint, validator_rejected, voted_out."
         ),
     )
+    # ---- incremental scan support -------------------------------------
+    file_hashes: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Per-file content hashes (relative path -> sha256) for the scanned "
+            "scope. Used by --incremental to skip unchanged files next run."
+        ),
+    )
+    # ---- cost governance ----------------------------------------------
+    max_budget_usd: float = Field(
+        default=0.0, description="Global per-run budget ceiling (0 = unlimited)."
+    )
+    budget_exceeded: bool = Field(
+        default=False,
+        description="True if the run hit the global budget and skipped remaining paid stages.",
+    )
