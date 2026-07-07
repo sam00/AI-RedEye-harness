@@ -16,6 +16,22 @@ first hit:
 Use `redeye doctor --profile NAME` to confirm which profile actually
 loaded -- the printed `source_path` is the file the loader picked.
 
+## Bundled profiles
+
+| Name | Backend(s) | Models | Notes |
+|---|---|---|---|
+| `default` | `cli` | claude-sonnet-4-6 | Laptop/interactive; no API key. Single-pass. |
+| `full` | `sdk` + `cli` + `openai` | Haiku / Sonnet / GPT-4o | Multi-backend with cross-family voting. |
+| `fable` | `sdk` | claude-fable-5 (heavy) + claude-haiku-4 (cheap) | Highest-capability; needs `ANTHROPIC_API_KEY` + `redeye[sdk]`. |
+| `cli` | `cli` | claude-sonnet-4-6 | Minimal CLI-only profile. |
+| `mock` | `mock` | deterministic | Zero-cost; CI and demos. |
+
+Selecting Fable 5: `redeye scan --repo . --profile fable`. It routes the
+research and adversarial stages through Claude Fable 5 and the cheap
+survey/report/validation stages through a Haiku-class model. Alternatively,
+`REDEYE_PREFER_QUALITY=1` upgrades the auto profile's SDK model to
+`claude-fable-5` without picking a named profile.
+
 ## Profile schema
 
 ```yaml

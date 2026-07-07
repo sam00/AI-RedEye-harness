@@ -231,6 +231,7 @@ def _render_env(rows: list[Detection], chosen_profile: str) -> str:
         "default": {"cli"},
         "cli": {"cli"},
         "full": {"sdk", "openai", "cli"},
+        "fable": {"sdk"},
         "mock": set(),
     }
     relevant = profile_to_backends.get(chosen_profile, {chosen_profile})
@@ -306,7 +307,7 @@ def run(
     else:
         profile = Prompt.ask(
             "Profile to use",
-            choices=["default", "cli", "full", "mock"],
+            choices=["default", "cli", "full", "fable", "mock"],
             default=rec_profile,
         )
 

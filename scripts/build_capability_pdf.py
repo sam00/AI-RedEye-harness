@@ -482,7 +482,7 @@ def build(output: Path) -> None:
     )
     story.append(
         Paragraph(
-            "Profiles bundled: default, cli, full, mock, ollama_local. Each profile maps logical "
+            "Profiles bundled: default, cli, full, fable, mock, ollama_local. Each profile maps logical "
             "roles (surveyor, researcher, adversary, ...) to concrete models, temperatures, token "
             "and per-stage USD budgets.",
             SMALL,

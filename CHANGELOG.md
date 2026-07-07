@@ -6,6 +6,56 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Claude Fable 5 support.** New bundled `fable` profile routes the heavy
+  research and adversarial stages through `claude-fable-5` on the `sdk`
+  backend (cheap stages stay Haiku-class). Fable 5 pricing ($10/$50 per
+  MTok in/out) added to the SDK cost table, and `REDEYE_PREFER_QUALITY=1`
+  now upgrades the auto profile's SDK model to `claude-fable-5`. `fable` is
+  now offered by the `init` wizard and listed in every profile enumeration.
+- **Claude Opus 4.8 support.** `claude-opus-4-8` added to the SDK price
+  table (Opus tier, $15/$75 per MTok in/out); selectable per-role in any
+  `sdk` profile.
+- **External-scanner corroboration signal (#2).** Findings that an
+  independent tool (Semgrep/CodeQL/Bandit/Trivy/SARIF) also flagged now earn
+  a distinct `externally_corroborated` signal in the S8c K-of-N verdict.
+  Zero LLM cost. New module `redeye/corroboration.py`.
+- **Graph/AST-backed grounding (#1).** S4b now confirms Python findings cite
+  a real *call* to a sink-family function (AST), not just a nearby token,
+  and can rescue findings the token catalog missed. New module
+  `redeye/ast_grounding.py`.
+- **Behavioral PoC oracle (#6).** S8b now proves a PoC payload would actually
+  subvert the sink (SQLi/cmd-injection/path-traversal/SSRF/XSS/code-exec)
+  instead of only checking that it *looks* concrete. New module
+  `redeye/poc_oracle.py`; sets `poc_demonstrated`.
+- **Two-key HIGH/CRITICAL promotion (#9).** Optional policy-gate rule: a
+  finding may only report at HIGH/CRITICAL with a model confirmation AND
+  (corroboration OR a demonstrated PoC); otherwise it is capped at MEDIUM.
+- **Labeled-benchmark evaluation (#3).** New `redeye eval` command +
+  `redeye/eval_harness.py` compute precision / recall / F1 / hallucination
+  rate against a bundled benchmark (`redeye/eval/benchmark`), with CI gates
+  (`--min-precision`, `--min-recall`, `--max-hallucination`).
+- **Closed-set citation, self-consistency, evidence-quoting verdicts
+  (#4/#5/#7).** Deterministic cores in `redeye/precision.py`: lenses may only
+  cite inventory locations; recurring-across-samples aggregation; judge
+  verdicts must quote real source (`unquoted-verdict` tag).
+- **Calibrated confidence + abstention (#8).** `redeye/abstention.py` adds
+  Platt scaling over reviewer history plus a confirm/uncertain/reject band
+  that routes borderline findings to a human.
+- **Per-finding provenance (#10).** Every finding is stamped with model,
+  prompt hash, sampling params, and structural-index hash
+  (`redeye/provenance.py`) for reproducibility and audit.
+- **HTML + PDF reports.** Opt-in `--html` renders a self-contained
+  interactive report (filter by severity/CWE/grounded); opt-in `--pdf`
+  renders a styled PDF (needs `reportlab`). Markdown + SARIF remain the
+  defaults. Modules `redeye/output/html.py` and `redeye/output/pdf.py`.
+
+### Fixed
+- **AST grounding proximity window.** `sink_call_on_line` now defaults to a
+  ±1-line window (was ±2), so a finding cited two lines away from the real
+  sink is correctly rejected instead of spuriously grounded.
+
 ## [0.3.0] -- 2026-06-19
 
 Initial public release.

@@ -1,0 +1,12 @@
+{
+  "description": "Ground-truth labels for the redeye eval benchmark. Each entry is a real vulnerability an ideal scan should report. Line numbers are pinned to the source files in this directory.",
+  "line_tolerance": 3,
+  "vulns": [
+    {"path": "vuln_sql.py", "line": 16, "cwe": "CWE-89", "note": "string-concatenated SQL in get_user"},
+    {"path": "vuln_cmd.py", "line": 10, "cwe": "CWE-78", "note": "os.system with tainted host in ping"}
+  ],
+  "known_clean": [
+    {"path": "vuln_sql.py", "line": 24, "cwe": "CWE-89", "note": "parameterised query -- reporting here is a false positive"},
+    {"path": "vuln_cmd.py", "line": 16, "cwe": "CWE-78", "note": "argv subprocess, shell=False -- reporting here is a false positive"}
+  ]
+}

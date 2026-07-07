@@ -82,7 +82,8 @@ work. If a scan fails, fix the *config* or the *target*, not the harness.
 | `redeye setup --install-agents` | Drop AI-agent operating instructions into the cwd. | Creates `AGENTS.md`, `CLAUDE.md`, etc. (only if absent). |
 | `redeye doctor` | Verify credentials + backend reachability for active profile. | Network probe per backend. |
 | `redeye estimate --repo PATH` | Cost / scope estimate. | No LLM calls. |
-| `redeye scan --repo PATH ...` | Full pipeline run. | Writes report + SARIF + manifest. |
+| `redeye scan --repo PATH ...` | Full pipeline run. | Writes report + SARIF + manifest (`--html`/`--pdf` add those formats). |
+| `redeye eval [--profile P]` | Score a scan against a labeled benchmark (precision/recall/F1/hallucination). | Runs the pipeline over the benchmark; no writes unless `--output-json`. |
 
 ## When the user asks for a scan
 

@@ -17,8 +17,20 @@ from redeye.backends.mock import MockBackend
 log = logging.getLogger(__name__)
 
 # Best-effort price table. Override in the profile if precision matters.
-_PRICE_PER_MTOK_IN = {"claude-sonnet-4-6": 3.0, "claude-haiku-4": 0.80, "claude-opus-4-7": 15.0}
-_PRICE_PER_MTOK_OUT = {"claude-sonnet-4-6": 15.0, "claude-haiku-4": 4.0, "claude-opus-4-7": 75.0}
+_PRICE_PER_MTOK_IN = {
+    "claude-sonnet-4-6": 3.0,
+    "claude-haiku-4": 0.80,
+    "claude-opus-4-7": 15.0,
+    "claude-opus-4-8": 15.0,
+    "claude-fable-5": 10.0,
+}
+_PRICE_PER_MTOK_OUT = {
+    "claude-sonnet-4-6": 15.0,
+    "claude-haiku-4": 4.0,
+    "claude-opus-4-7": 75.0,
+    "claude-opus-4-8": 75.0,
+    "claude-fable-5": 50.0,
+}
 
 
 class AnthropicSdkBackend(BackendBase):

@@ -32,6 +32,7 @@ SIGNAL_NAMES: tuple[str, ...] = (
     "concrete_poc",
     "reachable",
     "vote_confirmed",
+    "externally_corroborated",
 )
 
 
@@ -64,6 +65,10 @@ def deterministic_signals(finding: Finding, *, reachable_threshold: float = 0.5)
         "concrete_poc": finding.has_concrete_poc(),
         "reachable": reachable,
         "vote_confirmed": bool(vote_confirmed),
+        # Improvement #2: independent-tool agreement is a distinct, zero-token
+        # signal derived from a *different* source (external scanners) than any
+        # other signal, so it genuinely widens the cross-check.
+        "externally_corroborated": bool(finding.has_external_corroboration()),
     }
 
 

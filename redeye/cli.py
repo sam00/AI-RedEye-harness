@@ -126,6 +126,59 @@ def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
         sys.exit(2)
 
 
+@main.command("eval")
+@click.option("--profile", default=None, help="Profile to evaluate (default: mock).")
+@click.option(
+    "--benchmark",
+    type=click.Path(exists=True, file_okay=False),
+    default=None,
+    help="Benchmark target directory (default: bundled redeye/eval/benchmark).",
+)
+@click.option(
+    "--labels",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Ground-truth labels JSON (default: <benchmark>/labels.json).",
+)
+@click.option("--min-precision", type=float, default=0.0, help="Fail if precision below this.")
+@click.option("--min-recall", type=float, default=0.0, help="Fail if recall below this.")
+@click.option(
+    "--max-hallucination", type=float, default=1.0, help="Fail if hallucination rate above this."
+)
+@click.option(
+    "--output-json", type=click.Path(dir_okay=False), default=None, help="Write metrics JSON here."
+)
+@click.pass_context
+def eval_cmd(
+    ctx: click.Context,
+    profile: str | None,
+    benchmark: str | None,
+    labels: str | None,
+    min_precision: float,
+    min_recall: float,
+    max_hallucination: float,
+    output_json: str | None,
+) -> None:
+    """Score a scan against a labeled benchmark (precision/recall/hallucination)."""
+    from redeye.commands.eval import run as run_eval
+
+    try:
+        code = run_eval(
+            console=ctx.obj["console"],
+            profile=profile,
+            benchmark=benchmark,
+            labels=labels,
+            min_precision=min_precision,
+            min_recall=min_recall,
+            max_hallucination=max_hallucination,
+            output_json=output_json,
+        )
+    except RedEyeError as exc:
+        console.print(f"[red]eval failed:[/red] {exc}")
+        sys.exit(2)
+    sys.exit(code)
+
+
 @main.command()
 @click.option("--repo", type=click.Path(exists=True, file_okay=False), help="Path to a repo.")
 @click.option(
@@ -137,7 +190,7 @@ def estimate(ctx: click.Context, repo: str, profile: str | None) -> None:
     "--profile",
     default=None,
     help=(
-        "Profile name (default | cli | full | mock | auto) or path to YAML. "
+        "Profile name (default | cli | full | fable | mock | auto) or path to YAML. "
         "When unspecified, RedEye auto-detects the best-available backend "
         "on this machine -- pass --profile default to force the bundled "
         "default profile instead."

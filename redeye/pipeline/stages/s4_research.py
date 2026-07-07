@@ -170,6 +170,72 @@ def run(ctx) -> StageResult:  # type: ignore[no-untyped-def]
     for s in skipped:
         per_lens_count[f"{s}:skipped"] = 0
 
+    # --- Per-finding provenance (improvement #10, no LLM cost) -------------
+    # Stamp every finding with model + prompt-context hash + sampling params +
+    # structural-index hash so any finding is reproducible and auditable. The
+    # stamp lands in Finding.provenance and flows into run_manifest.json.
+    import json as _json
+
+    from redeye.provenance import stamp_findings
+
+    _structural = ctx.artifacts.get("structural_index")
+    _prompt_ctx = _json.dumps(
+        {
+            "research_plan": ctx.artifacts.get("research_plan", {}),
+            "custom_prompt": ctx.custom_prompt or "",
+        },
+        sort_keys=True,
+        default=str,
+    )
+    stamp_findings(
+        findings,
+        model=model,
+        prompt=_prompt_ctx,
+        temperature=temperature,
+        structural_index=_structural
+        if isinstance(_structural, str)
+        else _json.dumps(_structural, sort_keys=True, default=str),
+    )
+
+    # --- Closed-set citation enforcement (improvement #4, no LLM cost) -----
+    # A lens finding may only cite a sink/source location that exists in the
+    # S1b structural inventory. Default OFF (tag-only); with params.strict it
+    # drops off-inventory findings so an invented sink can't reach the report.
+    off_inventory = 0
+    closed_set = bool(stage_cfg.params.get("closed_set_citations", False))
+    if closed_set and isinstance(_structural, dict):
+        try:
+            from redeye.precision import in_closed_set
+
+            inv = [
+                (h["path"], int(h["line"]))
+                for kind in ("sinks", "sources")
+                for h in (_structural.get(kind) or [])
+                if h.get("path") and h.get("line")
+            ]
+            strict_cs = bool(stage_cfg.params.get("closed_set_strict", False))
+            survivors: list[Finding] = []
+            for f in findings:
+                loc = f.locations[0] if f.locations else None
+                ok = loc is None or in_closed_set(loc.path, loc.start_line, inv)
+                if ok:
+                    survivors.append(f)
+                else:
+                    off_inventory += 1
+                    if "off-inventory" not in f.tags:
+                        f.tags.append("off-inventory")
+                    if not strict_cs:
+                        survivors.append(f)
+            findings = survivors
+        except Exception:  # noqa: BLE001 - closed-set must never abort a scan
+            off_inventory = 0
+
+    # --- Self-consistency knob (improvement #5) ---------------------------
+    # Recognised here so profiles can request it; the sampling loop lives in
+    # the lens runner (redeye.precision.self_consistency_keep is the pure
+    # aggregator). samples<=1 is a no-op single pass.
+    self_consistency_samples = int(stage_cfg.params.get("self_consistency_samples", 1))
+
     # --- Confidence calibration from reviewer feedback (no LLM cost) -------
     # Learn per-CWE / per-lens reliability from prior TP/FP marks and nudge
     # confidence so historically-noisy categories sit lower (and may fall
@@ -186,6 +252,8 @@ def run(ctx) -> StageResult:  # type: ignore[no-untyped-def]
             "per_lens_count": per_lens_count,
             "lenses_skipped": skipped,
             "calibration": calib_metrics,
+            "off_inventory": off_inventory,
+            "self_consistency_samples": self_consistency_samples,
         },
         tokens_in=total_in,
         tokens_out=total_out,

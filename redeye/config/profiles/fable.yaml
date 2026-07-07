@@ -1,0 +1,126 @@
+# Fable profile -- highest-capability single-backend layout.
+#
+# Routes the heavy reasoning stages (research + adversarial review) through
+# Anthropic's Claude Fable 5 via the `sdk` backend, and keeps the cheap
+# survey / report / validation stages on a Haiku-class model to control
+# cost. Fable 5 is the strongest generally-available model, so this profile
+# trades higher spend for maximum recall on the discovery + review stages
+# while the deterministic v0.3 layers carry the precision burden.
+#
+# Requires: ANTHROPIC_API_KEY (or ANTHROPIC_SDK_API_KEY) and the `sdk`
+# extra installed (`pip install redeye[sdk]`). Run `redeye doctor
+# --profile fable` to confirm the backend is reachable.
+#
+# Best for: high-stakes audits where recall matters more than cost. For
+# everyday laptop use prefer `default` (cli) or `full` (multi-backend).
+
+name: fable
+
+roles:
+  surveyor:
+    via: sdk
+    model: claude-haiku-4
+    temperature: 0.0
+    max_tokens: 4096
+  researcher:
+    via: sdk
+    model: claude-fable-5
+    temperature: 0.0
+    max_tokens: 8192
+  adversary:
+    via: sdk
+    model: claude-fable-5
+    temperature: 0.2
+    max_tokens: 8192
+  reporter:
+    via: sdk
+    model: claude-haiku-4
+    temperature: 0.0
+    max_tokens: 4096
+  validator:
+    # Cheap, fast model for the single-pass S6.5 TP/FP gate.
+    via: sdk
+    model: claude-haiku-4
+    temperature: 0.0
+    max_tokens: 1024
+
+stages:
+  s1_attack_surface:
+    skill: attack_surface_mapper
+    role: surveyor
+    max_budget_usd: 0.50
+  s1b_structural:
+    # Deterministic regex/AST pre-index. Zero LLM cost; massive precision lift.
+    skill: structural_index
+    role: surveyor
+    max_budget_usd: 0.0
+    params:
+      external_scanners: []
+      max_cross_file_flows: 50
+  s2_threat_model:
+    skill: threat_modeler
+    role: surveyor
+    max_budget_usd: 0.50
+  s3_strategize:
+    skill: research_strategist
+    role: researcher
+    max_budget_usd: 0.75
+  s4_research:
+    skill: research_lenses
+    role: researcher
+    max_budget_usd: 8.00
+    params:
+      lenses: [language, crypto, logic, access_control, iac]
+  s4b_grounding:
+    # Verify every cited file:line against the actual source. No LLM.
+    skill: grounding_pass
+    role: surveyor
+    max_budget_usd: 0.0
+    params:
+      strict: false
+  s5_policy_gate:
+    skill: policy_gate
+    role: surveyor
+    max_budget_usd: 0.20
+  s6_adversarial:
+    skill: adversarial_reviewer
+    role: adversary
+    max_budget_usd: 4.00
+  s6b_validator:
+    skill: validator
+    role: validator
+    max_budget_usd: 0.50
+  s7_dedupe:
+    skill: dedupe
+    role: reporter
+    max_budget_usd: 0.10
+  s8_chain:
+    skill: exploit_strategist
+    role: reporter
+    max_budget_usd: 1.50
+  s8b_poc:
+    # Demand a concrete exploit string. Findings without one get demoted.
+    skill: poc_gate
+    role: validator
+    max_budget_usd: 1.00
+    params:
+      strict: false
+  s8c_verify:
+    # Deterministic K-of-N outcome verification. No LLM cost.
+    skill: outcome_verifier
+    role: validator
+    max_budget_usd: 0.00
+    params:
+      threshold: 3
+      strict: false
+  s9_emit:
+    skill: emit
+    role: reporter
+    max_budget_usd: 0.10
+
+voting:
+  # Single-model profile -- no cross-family diversity to vote with, so the
+  # multi-agent tally is disabled. Use `full` for genuine cross-model voting.
+  enabled: false
+  quorum: 1
+  voters: [researcher]

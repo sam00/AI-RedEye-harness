@@ -26,7 +26,7 @@ def test_detection_includes_mock_always_available() -> None:
 def test_recommendation_returns_a_known_profile() -> None:
     rows = _detect()
     profile, _why = _recommend(rows)
-    assert profile in {"default", "cli", "full", "mock"}
+    assert profile in {"default", "cli", "full", "fable", "mock"}
 
 
 def test_render_env_contains_redeye_profile_line() -> None:

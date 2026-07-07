@@ -220,6 +220,33 @@ class Finding(BaseModel):
     verification: VerificationResult | None = Field(
         default=None, description="Outcome-verification verdict (S8c)."
     )
+    # ---- v0.4 precision + verification layer --------------------------
+    externally_corroborated: bool = Field(
+        default=False,
+        description="True iff an independent scanner (Semgrep/CodeQL/Bandit/Trivy) also flagged this file:line:cwe (improvement #2).",
+    )
+    corroborating_tools: list[str] = Field(
+        default_factory=list,
+        description="Names of external scanners that independently flagged this finding.",
+    )
+    poc_demonstrated: bool = Field(
+        default=False,
+        description="True iff the behavioral PoC oracle proved the payload subverts the sink (improvement #6).",
+    )
+    calibrated_confidence: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Platt-calibrated probability from reviewer history (improvement #8). None = not calibrated.",
+    )
+    abstained: bool = Field(
+        default=False,
+        description="True iff the finding fell in the calibrated abstention band and is routed to a human as 'uncertain'.",
+    )
+    provenance: dict[str, str] = Field(
+        default_factory=dict,
+        description="Reproducibility trail: model, prompt_sha256, seed/temperature, structural_index_sha (improvement #10).",
+    )
     # ---- audit trail ---------------------------------------------------
     tags: list[str] = Field(default_factory=list)
     skill: str | None = Field(default=None, description="Producing skill name.")
@@ -231,6 +258,12 @@ class Finding(BaseModel):
 
     def has_grounding_evidence(self) -> bool:
         return any(e.check == "pass" and e.kind == "snippet_match" for e in self.evidence)
+
+    def has_external_corroboration(self) -> bool:
+        """True iff an independent scanner corroborated this finding (improvement #2)."""
+        return self.externally_corroborated or any(
+            e.check == "pass" and e.kind == "external_corroboration" for e in self.evidence
+        )
 
 
 class StageResult(BaseModel):

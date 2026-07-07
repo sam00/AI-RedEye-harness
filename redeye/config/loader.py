@@ -168,7 +168,7 @@ def load_profile(profile: str | None = None) -> Profile:
         raise ConfigError(f"Failed to load any profile: {last_error}")
     if strict:
         raise ConfigError(
-            f"Profile {profile!r} not found. Use one of: default, cli, full, mock; "
+            f"Profile {profile!r} not found. Use one of: default, cli, full, fable, mock; "
             f"or pass a path to a YAML file."
         )
     raise ConfigError("No profile found and no built-in default available.")

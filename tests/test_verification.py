@@ -39,6 +39,8 @@ def _strong_finding() -> Finding:
         taint=TaintFlow(source="request.json['q']", sink="db.execute(...)"),
         poc=ProofOfConcept(payload="' OR '1'='1", invocation="curl ...", is_concrete=True),
         votes=[Vote(role="adversary", model="m", verdict="confirm", rationale="reachable")],
+        externally_corroborated=True,
+        corroborating_tools=["semgrep"],
     )
 
 
@@ -55,7 +57,15 @@ def test_all_signals_pass_is_verified():
         "concrete_poc",
         "reachable",
         "vote_confirmed",
+        "externally_corroborated",
     }
+
+
+def test_external_corroboration_is_a_signal():
+    # A finding corroborated by an independent scanner earns the new signal.
+    f = _finding(externally_corroborated=True, corroborating_tools=["codeql"])
+    assert deterministic_signals(f)["externally_corroborated"] is True
+    assert deterministic_signals(_finding())["externally_corroborated"] is False
 
 
 def test_empty_finding_not_verified():

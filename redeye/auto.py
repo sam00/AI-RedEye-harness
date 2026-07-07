@@ -29,9 +29,10 @@ The detection is intentionally conservative -- it picks Sonnet-class
 models rather than Opus-class even when both might be available, because
 RedEye's deterministic grounding and PoC layers already do the heavy
 precision lifting and Sonnet is the cost-quality sweet spot. Operators
-who want the strongest available model can either set the model
-identifier explicitly via ``--profile full`` (which uses Opus where
-configured) or pass ``REDEYE_PREFER_QUALITY=1`` (see below).
+who want the strongest available model can either select ``--profile
+fable`` (Claude Fable 5 on the SDK backend) or ``--profile full`` for a
+multi-backend layout, or pass ``REDEYE_PREFER_QUALITY=1`` -- which on the
+SDK backend upgrades the auto profile to Claude Fable 5 (see below).
 """
 
 from __future__ import annotations
@@ -59,9 +60,10 @@ class BackendChoice:
 
 
 # Model strings used when REDEYE_PREFER_QUALITY=1 upgrades to "strongest"
-# tier. Conservative -- Opus where it makes sense, GPT-4 family on OpenAI.
+# tier. On the Anthropic SDK this is Claude Fable 5 -- the strongest
+# generally-available model; other backends keep their conservative top tier.
 _QUALITY_UPGRADES: dict[str, str] = {
-    "sdk": "claude-opus-4-7",
+    "sdk": "claude-fable-5",
     "bedrock": "anthropic.claude-opus-4-5-20251101-v1:0",
     "cli": "claude-sonnet-4-6",  # CLI can't pin Opus reliably; keep Sonnet
     "openai": "gpt-4o",

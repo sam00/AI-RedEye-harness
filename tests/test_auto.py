@@ -94,8 +94,8 @@ def test_quality_env_var_upgrades_model(monkeypatch):
     monkeypatch.setenv("REDEYE_PREFER_QUALITY", "1")
     choice = detect_best_backend(probe_network=False)
     assert choice.backend == "sdk"
-    # Quality upgrade should pick Opus over Sonnet.
-    assert "opus" in choice.model.lower()
+    # Quality upgrade should pick Fable 5 over the default Sonnet.
+    assert choice.model == "claude-fable-5"
 
 
 def test_build_auto_profile_has_all_quality_stages(monkeypatch):

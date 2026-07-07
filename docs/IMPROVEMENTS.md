@@ -1,47 +1,45 @@
 # RedEye Harness — Improvements & Capabilities
 
 A detailed, implementation-grounded write-up of what `redeye` (the AI-RedEye
-harness) is, and the concrete improvements it makes over a naive
-"ask-an-LLM-to-find-bugs" SAST loop. The emphasis is on the three things that
-make or break AI-driven SAST in production:
+harness) is, the concrete improvements it makes over a naive
+"ask-an-LLM-to-find-bugs" SAST loop, how it goes beyond its ancestor **VVAH**,
+and why it is pleasant to actually operate. The emphasis throughout is the
+four things that make or break AI-driven SAST in production:
 
-1. **Fewer false positives**
-2. **Less hallucination** (no invented files, lines, sinks, or CWEs)
-3. **Reduced cost** (token spend bounded and pruned cheaply)
-
-…plus the operational, auditability, and portability improvements that make it
-usable as both a researcher's deep-dive and a PR gate.
+1. **Validated & verified output** — every reported finding has survived
+   independent, cross-checking evidence, and quality is *measured* against
+   ground truth rather than asserted.
+2. **Less hallucination** — no invented files, lines, sinks, or CWEs.
+3. **Fewer false positives.**
+4. **Bounded, predictable cost.**
 
 > RedEye is a derivative of Visa's **Vulnerability Agentic Harness (VVAH)**
 > (Apache-2.0), substantially reworked and extended. See `NOTICE` and the
-> README attribution.
+> README attribution. §10 details what changed relative to VVAH.
 
 ---
 
 ## 1. The problem RedEye is built to solve
 
 LLM-driven SAST is *noisy by default*. A frontier model asked "find vulns in
-this repo" will happily:
+this repo" will happily cite files and line numbers that do not exist,
+hallucinate sinks the code never calls, assert a CWE the code does not exhibit,
+and write confident "remediations" for bugs that were never there.
 
-- cite files and line numbers that do not exist,
-- hallucinate sinks/sources the code never calls,
-- assert a CWE the code does not exhibit,
-- and write confident "remediations" for bugs that were never there.
-
-RedEye's core design principle: **put cheap, deterministic checks in front of
-every finding** so that what reaches a human cites real code and has survived
-every inexpensive check the harness can run. The model is allowed to be
-*aggressive about discovery* precisely because deterministic layers carry the
-precision burden.
+RedEye's core design principle: **put cheap, deterministic, cross-checking
+evidence in front of every finding** so that what reaches a human cites real
+code and has survived every inexpensive check the harness can run. The model is
+allowed to be *aggressive about discovery* precisely because deterministic
+layers carry the precision burden.
 
 ---
 
 ## 2. Architecture at a glance
 
-A 14-stage pipeline grouped into three phases. Critically, **five stages are
-fully deterministic and never call an LLM** (`S1b` structural pre-index, `S4b`
-grounding pass, `S5` policy gate, `S7` dedupe, and the voting *tally* in `S6`),
-plus the deterministic `S8c` outcome verifier.
+A 14-stage pipeline grouped into three phases. Critically, **the majority of
+stages are fully deterministic and never call an LLM** (`S1b` structural
+pre-index, `S4b` grounding pass, `S5` policy gate, `S7` dedupe, the `S6` voting
+tally, and the `S8c` outcome verifier).
 
 | Phase | Stages | Purpose |
 |---|---|---|
@@ -53,277 +51,282 @@ Reference: `docs/architecture.md`, `docs/REDUCING_HALLUCINATIONS.md`.
 
 ---
 
-## 3. Improvement: fewer false positives
+## 3. Supported frontier models & backends
 
-False positives are attacked with a *defense-in-depth* stack, ordered so the
-cheap deterministic filters run first and the model never wastes tokens on a
-finding that already failed a free check.
+RedEye is backend-pluggable through a single registry
+(`redeye/backends/__init__.py`); no provider is a hard dependency, and every
+real backend falls back to the deterministic `mock` on error so a run always
+completes.
 
-**Multi-agent voting (S6) — the biggest LLM-side lever.**
-Voting runs *after* the adversarial reviewer rewrites the attack chain, so
-voters score the refined finding, not raw lens output. A finding survives only
-if it clears a configurable quorum (default `>= 2` confirms). N-of-M voting
-specifically kills *correlated* false positives — but only when voters
-disagree, which is why the docs recommend **cross-vendor voters** (e.g.
-Anthropic + OpenAI + a local model). Identical models make identical mistakes.
+| Backend (`via`) | Provider | Models with first-class pricing/wiring |
+|---|---|---|
+| `sdk` | Anthropic API | **`claude-opus-4-8`**, `claude-opus-4-7`, `claude-fable-5`, `claude-sonnet-4-6`, `claude-haiku-4` |
+| `cli` | Claude Code CLI | `claude-sonnet-4-6` |
+| `bedrock` | AWS Bedrock | `anthropic.claude-opus-4-5`, `claude-3-5-sonnet`, `claude-3-haiku` |
+| `vertex` | Google Vertex AI | `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-1.5-pro` |
+| `openai` | OpenAI / OpenAI-compatible | `gpt-4o`, `gpt-4o-mini` |
+| `ollama` | Local Ollama | `qwen2.5-coder`, any local model |
+| `mock` | none (deterministic) | `mock-deep`, `mock-fast` |
 
-**Single-pass validator (S6.5).**
-A cheap, distinct TP/FP gate (Haiku / Gemini Flash class). It receives a
-compact dossier — deterministic grounding evidence + the taint shape — and
-returns `confirm` / `reject` / `uncertain`. The dossier shape is deliberate: it
-prevents the validator from rationalising away a hallucination.
-
-**Policy gate (S5, deterministic).**
-Drops findings in test/vendor paths, findings with no remediation, and findings
-below the severity floor — zero LLM cost.
-
-**Deduplication (S7, deterministic).**
-Merges the same root cause reported by multiple lenses, so one bug isn't
-counted (and reported) five times.
-
-**Outcome verification (S8c, deterministic).**
-A final **K-of-N verdict over five independent upstream signals**: grounding,
-taint completeness, concrete PoC, reachability, and voter/validator agreement.
-Because it is *temperature-free*, it suppresses false positives even on models
-that reject a `temperature` knob (e.g. Opus / the `claude` CLI) where voting
-degenerates to a no-op. Unverified findings are flagged, or dropped when its
-`strict` parameter is set.
-
-**Baseline acceptance (`.redeye-baseline.yaml`).**
-Operators accept reviewed findings once; their stable fingerprint
-(`sha256(cwe + path + start_line + skill)`) keeps them filtered out of every
-future report. The fingerprint is robust to LLM rewording but pinned to the
-structural identity of the bug. See `redeye/baseline.py`.
-
-**Feedback loop.**
-Reviewer TP/FP marks from PR comments persist to a local SQLite store
-(`~/.redeye/scans.db`) and are injected into the next scan's lens prompts as
-in-context calibration — the harness learns away from the FPs it produced last
-time.
+Bundled profiles: `default` (cli), `cli`, `full` (cross-vendor voting),
+**`fable`** (Fable 5 heavy + Haiku cheap), `mock`, `ollama_local`. Any model on
+a backend runs even without a priced entry (a default price is applied), so the
+lists above are the *priced* set, not an allowlist.
 
 ---
 
-## 4. Improvement: less hallucination (7-layer control)
+## 4. Validated & verified output (the v0.4 verification layer)
 
-This is the headline of the 0.3 redesign. Seven layers sit in front of the
-report; a finding cannot reach the operator without surviving every cheap
-deterministic check. (`docs/REDUCING_HALLUCINATIONS.md`.)
+This is the headline of the v0.4 work: moving from "we filtered the noise" to
+"every finding is independently corroborated, and we can *prove* it." Six
+improvements, all deterministic where possible.
+
+### 4.1 External-scanner corroboration — a new verification signal (#2)
+
+RedEye already ingests Semgrep / CodeQL / Bandit / Trivy / SARIF into the S1b
+inventory as candidate hotspots. v0.4 promotes that same signal into
+*verification*: when a RedEye finding lands on the same file / line
+neighbourhood / CWE that an independent tool also flagged, it earns a distinct
+`externally_corroborated` signal in the S8c K-of-N verdict. Independent-tool
+agreement is one of the strongest true-positive predictors available and costs
+zero tokens. Matching is basename-tolerant and CWE-aware (a different bug class
+at the same line does *not* corroborate). `redeye/corroboration.py`,
+`redeye/pipeline/verification.py`.
+
+### 4.2 Graph/AST-backed grounding (#1)
+
+The original grounding pass (S4b) accepts a finding when a CWE-family *token*
+appears within ±5 lines of the cited line. v0.4 upgrades this for Python
+targets: the file is parsed to an AST and the pass confirms the cited line
+actually contains a **call** to a sink-family function (`execute`, `os.system`,
+`eval`, …), not merely a suggestive word. This both hardens grounding against
+"plausible but wrong" citations and *rescues* real findings the coarse token
+catalog missed. Non-Python / unparseable sources fall back to the token check.
+`redeye/ast_grounding.py`, `redeye/grounding.py`.
+
+### 4.3 Behavioral PoC oracle (#6)
+
+The PoC gate (S8b) historically accepted any payload that *looked* concrete.
+v0.4 adds a deterministic **oracle** that reasons about whether the payload
+would actually subvert the sink: SQLi break-out + tautology/UNION/stacked
+query; command-injection metacharacter chaining a real command; ≥2 traversal
+hops or a sensitive target; SSRF against an internal/metadata host; active XSS
+vectors; code-exec tokens. A `demonstrated` verdict sets `poc_demonstrated` and
+becomes a strong TP signal for S8c and the two-key policy. No code is executed
+and no network is touched. `redeye/poc_oracle.py`.
+
+### 4.4 Two-key promotion for HIGH/CRITICAL (#9)
+
+Optional enterprise policy (`two_key_high_severity`): a finding may only
+*report* at HIGH or CRITICAL when it has two independent keys — a model
+confirmation (validator/adversary) **AND** a corroborating key (external
+corroboration or a demonstrated/concrete PoC). Otherwise its severity is capped
+at MEDIUM (never dropped) and it is tagged `capped:two-key`. This stops a single
+model's confident mistake from paging on-call. `redeye/pipeline/stages/s5_policy_gate.py`.
+
+### 4.5 Labeled-benchmark evaluation — `redeye eval` (#3)
+
+The per-run hallucination counters say what was *pruned*; they can't say
+whether reported findings are *correct*. `redeye eval` runs the pipeline over a
+benchmark with known vulnerabilities and reports **precision, recall, F1, and a
+true hallucination rate** (findings citing code that doesn't exist). It ships
+with a small bundled benchmark (`redeye/eval/benchmark` + `labels.json`) and
+supports CI gates:
+
+```bash
+redeye eval                                   # bundled benchmark, mock profile
+redeye eval --profile fable                   # measure a real backend
+redeye eval --min-precision 0.8 --min-recall 0.5 --max-hallucination 0.05
+```
+
+This is what turns "we reduced hallucination" from a claim into a tracked,
+regression-gated metric. `redeye/eval_harness.py`, `redeye/commands/eval.py`.
+
+### 4.6 Closed-set citation, self-consistency, evidence-quoting verdicts (#4/#5/#7)
+
+Deterministic cores in `redeye/precision.py`:
+
+- **Closed-set citation (#4):** a lens finding may only cite a sink/source
+  location present in the S1b inventory; off-inventory findings are tagged
+  `off-inventory` (or dropped under `closed_set_strict`), making "invented
+  sink" structurally impossible rather than caught later.
+- **Self-consistency (#5):** keep only findings that recur across *k* sampled
+  lens passes (aggregator provided; enable via `self_consistency_samples`).
+  Kills stochastic one-off hallucinations; for temperature-rejecting models
+  (Opus / `cli`) prompt-perturbation provides the diversity.
+- **Evidence-quoting verdicts (#7):** a validator "confirm" must quote source
+  that actually exists in the cited file; a verdict whose quote isn't found is
+  tagged `unquoted-verdict` (enable via `require_quoted_verdict`).
+
+### 4.7 Calibrated confidence + abstention (#8)
+
+`redeye/abstention.py` fits **Platt scaling** (a dependency-free logistic fit)
+over the reviewer TP/FP history already in `~/.redeye/scans.db`, turning a raw
+score into an empirically-calibrated probability, then bands it into
+confirm / **uncertain** / reject. The middle *abstention* band routes borderline
+findings to a human instead of asserting or silently dropping. Complements the
+existing per-CWE/per-skill reliability prior in `redeye/calibration.py`.
+
+### 4.8 Per-finding provenance (#10)
+
+Every finding is stamped (`redeye/provenance.py`) with the producing model, a
+SHA-256 of the prompt context (so secrets never hit disk), sampling params, and
+the structural-index hash. Combined with the `mock` backend this makes any
+finding reproducible and any run auditable — the backbone of "verified" output
+in regulated environments. The stamp lands in `Finding.provenance` and flows
+into `run_manifest.json` for free.
+
+---
+
+## 5. The pre-existing hallucination-reduction stack (v0.3)
+
+The v0.4 layer sits on top of the 0.3 controls, which remain the foundation:
 
 | Layer | Stage | What it kills | LLM cost |
 |---|---|---|---|
 | Structural pre-index | S1b | Invented routes/sources/sinks/secrets | **Zero** (regex/AST) |
-| Taint-flow schema | S4 contract | Hand-wavy findings with no source→sink theory | Zero (parse-time) |
-| Grounding pass | S4b | Cited file/line that doesn't exist; no CWE-family tokens nearby | **Zero** (file I/O) |
+| Taint-flow schema | S4 contract | Findings with no source→sink theory | Zero (parse-time) |
+| Grounding pass | S4b | Cited file/line that doesn't exist; no CWE evidence | **Zero** (file I/O + AST) |
 | Validator auto-reject | S6.5 | Findings already tagged hallucinated by S4b | Zero (skips the call) |
-| PoC gate | S8b | Findings the model can't write a concrete payload for | Cheap LLM |
+| PoC gate | S8b | Findings with no concrete/demonstrable payload | Cheap LLM + oracle |
 | Multi-agent voting | S6 | Findings only one voter agrees with | LLM × N |
 | Outcome verifier | S8c | Findings failing the K-of-N deterministic verdict | **Zero** |
 
-**Layer 1 — Structural pre-index (S1b).**
-Before *any* LLM call, regex + AST extract a deterministic inventory of the
-target's real **routes** (FastAPI/Flask/Express/Spring/Django), **sources**
-(request body, query, env, stdin, argv, Kafka), **sinks** (SQL execute,
-subprocess, eval/exec, unsafe deserialization, `os.system`, weak crypto, JWT
-misverification, SSRF, path traversal), and **secrets** (cloud/API tokens, PEM
-keys, high-entropy assignments). This inventory becomes ground truth: lenses
-reason "given these *real* sinks, which combos are dangerous?" instead of
-"imagine where bugs might be." A whole class of hallucination disappears
-because the model can no longer invent code that isn't there. (`redeye/structural.py`.)
-
-**Layer 2 — Explicit taint shape.**
-Every lens response must carry a `taint` block: `source`, `source_location`,
-`sink`, `sink_location`, `sanitizer_missing`, `sanitizers_observed`, and an
-ordered `taint_path` of file:line steps. A response without source + sink is
-rejected at parse time. This forces the model to hold a *theory* of the bug,
-and `sanitizers_observed` lets it disprove its own suspicion (e.g. "I saw an
-authz check that defeats this IDOR — not emitting").
-
-**Layer 3 — Grounding pass (S4b, deterministic).**
-For each finding it (1) resolves the cited path (rejects `..` escapes /
-nonexistent files), (2) checks the line is within the file, and (3) reads a
-±5-line window for CWE-family tokens (CWE-89 → `execute`/`query`/`cursor`;
-CWE-78 → `subprocess`/`shell`/`os.system`). Outcomes:
-
-| Outcome | Tag | Default | `--strict-grounding` |
-|---|---|---|---|
-| All pass | `grounded: true` | keep | keep |
-| File/line missing | `hallucinated:bad-path` / `bad-line` | keep + tag (validator auto-rejects) | **drop** |
-| Tokens missing | `weak-evidence` | keep, cap confidence ≤ 0.5 | keep, cap ≤ 0.5 |
-
-It also emits an `Evidence` row per finding (which checks passed/failed),
-surfaced in the Markdown report so reviewers can audit the harness's reasoning.
-
-**Layer 4 — Validator auto-reject.**
-S6.5 reads `finding.tags` *before* spending a token. Anything tagged
-`hallucinated:bad-path/bad-line` is auto-rejected — no point asking a model to
-confirm a bug citing fictional code.
-
-**Layer 5 — PoC gate (S8b).**
-The model must write a *concrete* exploit string. Syntactic checks require at
-least one of {quoted payload, URL, HTTP verb, injection metachar, `../`,
-`${`, `<script`, a SQL keyword}. Placeholders (`<exploit_here>`,
-`malicious_input`) are rejected. No concrete PoC → demote one severity notch
-(or drop with `--require-poc`). Rationale: a real bug usually has an obvious
-payload; if the model can't write one, it probably doesn't understand the bug.
-
-**Layers 6–7 — Voting + outcome verification** (see §3).
-
-**Per-finding evidence trail + hallucination metrics.**
-Every run emits counters (in `run_manifest.json` and the report header):
-
-```json
-{
-  "raw_lens": 24,
-  "ungrounded_dropped": 6,
-  "ungrounded_downgraded": 4,
-  "validator_rejected": 3,
-  "voted_out": 2,
-  "missing_poc": 1,
-  "outcome_unverified": 0
-}
-```
-
-These make the noise the harness pruned *visible* — a high `ungrounded_dropped`
-means a lens is hallucinating paths (tighten the prompt / use a stronger
-model); a high `voted_out` means voting is earning its keep. The metrics also
-feed the feedback loop.
+`docs/REDUCING_HALLUCINATIONS.md` has the long-form rationale for each. Note the
+S8c verdict now spans **six** independent signals: grounded, taint-complete,
+concrete-PoC, reachable, vote-confirmed, and (new) externally-corroborated.
 
 ---
 
-## 5. Improvement: reduced cost
+## 6. Fewer false positives
 
-Token spend is the dominant cost in agentic SAST. RedEye bounds and prunes it
-at multiple points:
-
-**Cheap-first filter ordering.**
-The pipeline deliberately runs **zero-LLM deterministic layers first** (S1b,
-S4b, S5, S7, S8c). A finding that cites a nonexistent path is dropped by file
-I/O *before* any model is asked to adversarially review, validate, or write a
-PoC for it. This is the single biggest structural cost saving.
-
-**Per-stage budget caps.**
-Every stage carries `max_budget_usd` in its profile; the sum is the worst-case
-spend per scan. When a stage runs out of budget it stops calling the backend
-but keeps its partial result. For most teams `s4_research` and `s6_adversarial`
-dominate the bill, so those caps are the main knobs. (`docs/configuration.md`.)
-
-**Cost/scope estimate before spending.**
-`redeye estimate --repo PATH` produces a **no-spend dry run** — file counts,
-language mix, and a rough USD budget per stage — so operators (and AI agents,
-per `AGENTS.md`) preview cost and confirm before running `scan`.
-
-**Scope control / DoS limits.**
-`Scope` (`redeye/scope.py`) bounds what the pipeline reads:
-`--diff-only`/`--pr-base` scopes a PR scan to only changed files via
-`git diff`; `--max-files`, `--max-file-bytes`, `--max-total-bytes` cap volume;
-`--exclude-path` drops test/vendor noise; and default ignore dirs
-(`node_modules`, `vendor`, `dist`, `.venv`, …) plus an interesting-extensions
-allowlist mean only relevant source is ever sent to a model.
-
-**Incremental structural cache.**
-The deterministic pre-index is cached per file by `(path, size, mtime_ns)` in
-`~/.redeye/cache/structural/<target>.json`. On the next scan, unchanged files
-are served from cache and only changed files are re-scanned. Cache hits never
-go stale silently (a 1-byte/1-ns change rebuilds). (`redeye/cache.py`.)
-
-**Cheap models where cheap is enough.**
-The validator (S6.5) and PoC gate (S8b) are explicitly Haiku- / Gemini-Flash-
-class jobs, reserving expensive models for the research lenses and adversarial
-review. Roles map to backends per-stage in the profile, so you pay premium
-rates only where they matter.
-
-**Validator auto-reject (also a cost win).**
-Skipping the LLM call for already-hallucinated findings (§4, layer 4) saves
-tokens on exactly the findings least worth spending them on.
-
-**Zero-cost mock backend.**
-`--preset quick` / `make demo` runs the full 14-stage pipeline deterministically
-with **no API keys and no network calls** — ideal for CI smoke tests and demos
-at literally zero LLM cost.
+Defense-in-depth, cheap deterministic filters first: multi-agent **voting**
+(cross-vendor voters recommended, default quorum ≥2), a distinct single-pass
+**validator** (S6.5), the deterministic **policy gate** (S5) + two-key
+promotion, **dedupe** (S7), **outcome verification** (S8c K-of-N), operator
+**baseline acceptance** (stable `sha256(cwe+path+line+skill)` fingerprint), and
+the SQLite **feedback loop** that injects prior TP/FP marks into the next scan's
+prompts and confidence calibration.
 
 ---
 
-## 6. Other notable improvements
+## 7. Reduced, predictable cost
 
-**Dual-mode, preset-driven UX.**
-One tool is both a researcher's deep-dive and a PR gate. Presets are
-default-overlays; any explicit flag still wins.
-
-| Preset | Backend | Scope | Grounding | Use when |
-|---|---|---|---|---|
-| `quick` | mock (no cost) | small | lenient | trying the tool, CI smoke tests |
-| `pr` | active profile | files changed vs base | strict | every PR |
-| `ci` | active profile | whole repo, DoS-capped | strict | nightly cron |
-| `deep` | active profile | unlimited | lenient | research deep-dive |
-
-**Multi-cloud / offline backends.**
-Anthropic (CLI + SDK), OpenAI / OpenAI-compatible, **AWS Bedrock**, **Google
-Vertex (Gemini)**, **Ollama (local)**, and the deterministic **mock** — auto-
-detected, with backends falling back to mock on error so a run still completes.
-No single provider is a hard dependency.
-
-**Native CI/CD + GitHub integration.**
-Drop-in GitHub Actions workflow runs PR scan + full scan + feedback collection.
-Findings emit **SARIF 2.1.0** with `security-severity` and taint `codeFlows`,
-so GitHub Code Scanning renders inline taint traces; PR comments carry
-`[ ] True Positive` / `[ ] False Positive` checkboxes that drive the feedback
-loop. Webhooks (Slack/Teams/Discord/generic) support optional HMAC signing.
-
-**Auditability by default.**
-Every run writes `run_manifest.json`: tool version, profile, config hash,
-target SHA, per-stage cost, and quality metrics — an immutable audit trail.
-
-**CVSS support.**
-Findings can carry `cvss_vector` + `cvss_score`; both flow into SARIF along
-with `security-severity`.
-
-**Extensibility.**
-New research lenses, backends, structural patterns, CWE token catalogs, and
-output emitters are all documented extension points (`docs/architecture.md`
-§Extending). Lens prompts read the structural inventory verbatim, so a new
-regex pattern is immediately visible to the model.
-
-**Safety posture.**
-`AGENTS.md` constrains AI agents driving the tool: don't edit the harness to
-make a scan pass, don't invent credentials, don't scan unnamed repos, and never
-treat findings as ground truth. `REDEYE_NO_NETWORK=1` hard-refuses
-network-using backends.
+Cheap-first ordering (zero-LLM layers run before any paid stage), per-stage
+`max_budget_usd` caps with a global guardrail, a no-spend `redeye estimate` dry
+run, scope/DoS limits (`--diff-only`, `--max-files`, `--exclude-path`, default
+ignore dirs), an incremental structural cache keyed by `(path, size, mtime_ns)`,
+cheap models for cheap stages (validator/PoC on Haiku-class), and a zero-cost
+`mock` backend for CI smoke tests. The new corroboration, AST grounding, PoC
+oracle, two-key, closed-set, and provenance layers are all **zero-token**.
 
 ---
 
-## 7. Improvements vs. a naive LLM-SAST loop (summary)
+## 8. Auditability, CI/CD & integration
 
-| Dimension | Naive "ask the LLM" | RedEye |
+`run_manifest.json` per run (tool version, profile, config hash, target SHA,
+per-stage cost + quality metrics, and now per-finding provenance). **SARIF
+2.1.0** output with `security-severity` and taint `codeFlows` for GitHub Code
+Scanning; PR comments with TP/FP checkboxes that drive the feedback loop;
+webhooks (Slack/Teams/Discord) with optional HMAC signing; a drop-in GitHub
+Actions workflow and reusable `action.yml`; CVSS vectors/scores carried into
+SARIF. `redeye doctor` reports per-backend reachability before a run.
+
+---
+
+## 9. User-friendliness
+
+RedEye is designed so a first run is easy and a hundredth run is predictable.
+
+- **Zero-setup first run.** `redeye scan --repo . --profile mock` runs the full
+  14-stage pipeline with **no API key and no network** and produces a
+  deterministic report — ideal for trying the tool, demos, and CI smoke tests.
+- **Guided setup.** `redeye init` (a.k.a. `make init`) detects which
+  credentials you have, recommends a profile (now including `fable`), explains
+  *why*, and writes a tailored `.env`. No global state, no telemetry, no
+  network calls.
+- **Auto backend detection.** With no `--profile`, RedEye picks the best
+  available backend on the machine; `REDEYE_PREFER_QUALITY=1` upgrades the SDK
+  path to Fable 5.
+- **Preset-driven dual mode.** One tool is both a researcher's deep-dive and a
+  PR gate. `--preset quick|pr|ci|deep` sets sensible scope/grounding defaults;
+  any explicit flag still wins.
+
+  | Preset | Backend | Scope | Grounding | Use when |
+  |---|---|---|---|---|
+  | `quick` | mock (no cost) | small | lenient | trying it / CI smoke |
+  | `pr` | active profile | changed files | strict | every PR |
+  | `ci` | active profile | whole repo, DoS-capped | strict | nightly |
+  | `deep` | active profile | unlimited | lenient | research |
+
+- **Spend before you commit.** `redeye estimate` previews files, language mix,
+  and per-stage USD budget with no LLM calls.
+- **Measurable quality on demand.** `redeye eval` gives a one-command
+  precision/recall/hallucination read-out — and a CI gate.
+- **Readable, self-contained reports.** Markdown with an evidence trail and
+  hallucination metrics up top, plus optional self-contained HTML and styled
+  PDF built straight from the manifest — no external service.
+- **Honest failure modes.** Backends fall back to `mock` on error rather than
+  crashing a run; malformed external feeds are recorded, never fatal;
+  `REDEYE_NO_NETWORK=1` hard-refuses network backends.
+- **Truthful `--help` and agent recipe.** `AGENTS.md`/`CLAUDE.md` document the
+  five-step recipe (`--version → doctor → estimate → scan → summarize`) so both
+  humans and AI agents drive the tool the same, safe way.
+
+---
+
+## 10. How RedEye improves on VVAH
+
+VVAH (Visa's Vulnerability Agentic Harness) pioneered the agentic-SAST loop
+RedEye descends from. RedEye keeps that lineage and hardens it for production
+operation, precision, and auditability.
+
+| Dimension | VVAH (baseline agentic loop) | RedEye |
 |---|---|---|
-| Invented file/line | Common | Dropped/tagged deterministically at S4b |
-| Invented sinks/CWE | Common | Constrained by S1b structural ground truth |
-| False positives | High | Voting + validator + policy gate + S8c K-of-N |
-| Cost control | Unbounded | Per-stage budgets, diff scope, cache, cheap-first ordering, mock |
-| Evidence | None | Per-finding PASS/FAIL evidence trail |
-| Repeat FPs | Re-reported every run | Baseline + SQLite feedback loop suppress them |
-| Auditability | None | `run_manifest.json` (version, hash, SHA, costs, metrics) |
-| Output | Free text | SARIF 2.1.0 + Markdown + manifest, GitHub-native |
+| Grounding | Prompt-level discipline | Deterministic S4b: path/line resolution **+ AST sink-call confirmation** (#1), evidence rows per finding |
+| Invented sinks/routes | Possible | Constrained by S1b ground truth **and closed-set citation** (#4) |
+| Verification | Model self-assessment | Deterministic **K-of-N over six independent signals** (S8c), temperature-free — works even where voting is a no-op |
+| Independent corroboration | Not a first-class signal | Semgrep/CodeQL/Bandit/Trivy agreement is a **verification signal** (#2) |
+| Proof of concept | "Describe an exploit" | Syntactic gate **+ behavioral oracle** that proves the payload subverts the sink (#6) |
+| Severity integrity | Model-assigned | **Two-key** rule caps HIGH/CRITICAL without independent corroboration (#9) |
+| Measuring quality | Anecdotal | `redeye eval`: precision/recall/**hallucination rate** vs. labeled benchmark, CI-gated (#3) |
+| Confidence | Raw model score | **Platt-calibrated** probability + explicit **abstention** band (#8) |
+| Reproducibility | Limited | Per-finding **provenance** (model, prompt hash, seed, index hash) + deterministic `mock` (#10) |
+| Backends | Provider-coupled | Six pluggable backends + mock, auto-detected, graceful fallback |
+| Cost control | Largely unbounded | Per-stage budgets, global guardrail, diff scope, incremental cache, cheap-first ordering |
+| Output & CI | Free text | SARIF 2.1.0 + Markdown + HTML/PDF + manifest; GitHub-native PR/feedback loop |
+| Repeat false positives | Re-reported | Baseline fingerprints + SQLite feedback loop suppress them |
+| Operability | Research-oriented | `init` wizard, presets, `doctor`, `estimate`, offline mock, truthful agent recipe |
+
+The throughline: VVAH proved the agentic loop; RedEye makes its output
+**validated, verified, measurable, reproducible, cheaper, and pleasant to
+run.**
 
 ---
 
-## 8. Limitations (honest framing)
+## 11. Limitations (honest framing)
 
-- **LLM-generated, non-deterministic.** Findings are *triage candidates*, not
-  confirmed vulns; two runs can differ unless every backend is `mock`.
-- **Token-hungry.** Caps are per-stage — use `estimate` and the DoS limits.
-- **Elevated privilege.** Run only against trusted repos by authorized operators.
-- **Feedback loop is local-first.** SQLite at `~/.redeye/scans.db`; a Databricks
-  backend is on the roadmap.
+- **LLM-generated, non-deterministic** on real backends — findings are triage
+  candidates, not confirmed vulns; two runs can differ unless every backend is
+  `mock`. Provenance + `eval` make the variation *visible and measurable*.
+- **AST grounding and the PoC oracle are strongest on Python** and the modeled
+  CWE families; other languages fall back to the token/heuristic checks.
+- **Self-consistency (#5) sampling loop** is wired as config + a tested
+  aggregator; enabling k>1 uses the lens sampling path.
+- **Token-hungry** on real backends — use `estimate`, presets, and DoS limits.
+- **Feedback/calibration are local-first** (SQLite at `~/.redeye/scans.db`).
 
 ---
 
-## 9. References (in-repo)
+## 12. References (in-repo)
 
 - `README.md` — overview, quickstart, presets, capabilities
 - `docs/architecture.md` — stage-by-stage pipeline + contracts
 - `docs/REDUCING_HALLUCINATIONS.md` — long-form rationale for each filter
+- `docs/IMPROVEMENT_RECOMMENDATIONS.md` — the roadmap these v0.4 features implement
 - `docs/configuration.md` — profiles, budgets, voter selection
 - `docs/CI_AND_FEEDBACK.md` — CI/CD wiring + feedback loop
-- `CHANGELOG.md` — 0.3.0 release notes
-- Source: `redeye/structural.py`, `redeye/grounding.py`, `redeye/scope.py`,
-  `redeye/cache.py`, `redeye/baseline.py`, `redeye/schema.py`
+- `CHANGELOG.md` — release notes
+- New source: `redeye/corroboration.py`, `redeye/ast_grounding.py`,
+  `redeye/poc_oracle.py`, `redeye/eval_harness.py`, `redeye/precision.py`,
+  `redeye/abstention.py`, `redeye/provenance.py`, `redeye/commands/eval.py`

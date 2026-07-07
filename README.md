@@ -14,6 +14,8 @@ Three design choices drive finding quality:
 
 Multi-cloud LLM by design: Anthropic (CLI / SDK), OpenAI / OpenAI-compatible, **AWS Bedrock**, **Google Vertex (Gemini)**, **Ollama (local)**. No single provider is a dependency.
 
+> **New — Claude Fable 5 support.** A bundled `fable` profile routes the heavy research and adversarial stages through Anthropic's `claude-fable-5` (cheap survey/report/validation stages stay Haiku-class) for maximum recall while the deterministic precision layers carry the false-positive burden. Run it with `redeye scan --profile fable`, or set `REDEYE_PREFER_QUALITY=1` to auto-upgrade the `auto` profile's SDK model. `claude-opus-4-8` is also selectable per-role in any `sdk` profile.
+
 > **Authorized use only.** Run scans only against code you own or have explicit permission to test. Findings are LLM-generated triage candidates that require human review — see [Limitations](#limitations).
 
 **Docs:** [`SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) · [`USER_GUIDE.md`](docs/USER_GUIDE.md) · [`architecture.md`](docs/architecture.md) · [`SKILLS.md`](docs/SKILLS.md) · [`configuration.md`](docs/configuration.md).
@@ -206,6 +208,9 @@ Operational layer (CI/CD + feedback):
 - **GitHub Actions workflow** — PR scan + full scan + feedback collection in one drop-in YAML at `.github/workflows/redeye-scan.yml`.
 - **CVSS** — every finding can carry a `cvss_vector` and `cvss_score`; SARIF emits both, plus `security-severity` for GitHub Code Scanning.
 - **New backends** — `bedrock` (AWS Claude), `vertex` (Gemini), `ollama` (local).
+- **Latest Anthropic models** — bundled `fable` profile using `claude-fable-5`, and `claude-opus-4-8` selectable per-role on the `sdk` backend (both priced in the cost table).
+- **Labeled-benchmark evaluation** — `redeye eval` scores a scan against ground truth (precision / recall / F1 / hallucination rate) with CI gates (`--min-precision`, `--min-recall`, `--max-hallucination`).
+- **HTML + PDF reports** — in addition to Markdown and SARIF, findings can be emitted as a self-contained HTML report and a PDF for sharing with non-CLI stakeholders.
 
 Agentic pipeline (from the 0.1 / 0.2 base):
 
@@ -314,6 +319,9 @@ redeye scan --repo . --webhook-url "$SLACK_URL" --webhook-type slack
 
 # Ingest reviewer marks from a PR comment
 echo "$COMMENT_BODY" | redeye collect-feedback
+
+# Score against a labeled benchmark (CI gate on quality)
+redeye eval --profile fable --min-precision 0.8 --min-recall 0.5
 ```
 
 ## GitHub Actions
@@ -339,6 +347,8 @@ Per target, under `<output_dir>`:
 
 - `<module>_<ts>_report.md` — Markdown report
 - `<module>_<ts>_report.sarif` — SARIF 2.1.0
+- `<module>_<ts>_report.html` — self-contained interactive HTML report (only with `--html`; filter by severity/CWE/grounded)
+- `<module>_<ts>_report.pdf` — styled PDF report (only with `--pdf`; needs `reportlab`)
 - `pr-comment.md` — (only with `--pr-comment`) Markdown shaped for `gh pr comment`
 - `run_manifest.json` + `run_manifest_<ts>.json` — audit record (tool version, profile, config hash, target SHA, per-stage costs)
 

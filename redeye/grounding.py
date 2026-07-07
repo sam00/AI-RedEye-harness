@@ -153,6 +153,21 @@ def _token_match(window: str, patterns: Iterable[re.Pattern]) -> bool:
     return any(p.search(window) for p in patterns)
 
 
+def _ast_sink_hit(path: Path, start_line: int, cwe: str | None) -> bool | None:
+    """Improvement #1: AST-confirm a sink-family call near the cited line for
+    Python files. Returns None for non-Python / unparseable / unmodelled CWEs
+    so the caller falls back to the token check."""
+    if path.suffix != ".py":
+        return None
+    try:
+        source = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    from redeye.ast_grounding import sink_call_on_line
+
+    return sink_call_on_line(source, start_line, cwe)
+
+
 def ground_one(*, finding: Finding, target: Path) -> Finding:
     """Mutate ``finding`` in place: append Evidence rows, set ``grounded``,
     apply ``weak-evidence`` / ``hallucinated`` tags as warranted.
@@ -202,6 +217,27 @@ def ground_one(*, finding: Finding, target: Path) -> Finding:
     window = _read_window(
         resolved, primary.start_line, primary.locations[0].end_line if False else primary.end_line
     )
+    # Improvement #1: for Python targets, confirm the cited line actually
+    # contains a *call* to a sink-family function (AST), not just a suggestive
+    # token nearby. ast_hit is True/False when we could judge, None otherwise.
+    ast_hit = _ast_sink_hit(resolved, primary.start_line, finding.cwe)
+    if ast_hit is True:
+        finding.evidence.append(
+            Evidence(
+                kind="ast_sink_match",
+                check="pass",
+                detail=f"AST confirms a {finding.cwe} sink-family call near line {primary.start_line}",
+            )
+        )
+    elif ast_hit is False:
+        finding.evidence.append(
+            Evidence(
+                kind="ast_sink_match",
+                check="fail",
+                detail=f"AST found no {finding.cwe} sink-family call near line {primary.start_line}",
+            )
+        )
+
     patterns = _cwe_family_tokens(finding.cwe)
     if patterns:
         if _token_match(window, patterns):
@@ -215,6 +251,18 @@ def ground_one(*, finding: Finding, target: Path) -> Finding:
             finding.grounded = True
             # Capture the window snippet so the report can show it without
             # the operator having to open the file. Truncate aggressively.
+            primary.snippet = (primary.snippet or "")[:500] or window[:500]
+        elif ast_hit is True:
+            # Token catalog missed it but the AST proves a real sink call is
+            # present -- rescue the finding rather than tag it weak.
+            finding.evidence.append(
+                Evidence(
+                    kind="snippet_match",
+                    check="pass",
+                    detail=f"AST-confirmed {finding.cwe} sink call (token catalog missed it)",
+                )
+            )
+            finding.grounded = True
             primary.snippet = (primary.snippet or "")[:500] or window[:500]
         else:
             finding.evidence.append(
