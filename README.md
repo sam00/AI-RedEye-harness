@@ -85,6 +85,7 @@ review; run only against code you own or are authorized to test.
 - **Dual-mode, preset-driven** — `--preset deep` for research, `--preset pr`/`ci` for gating, `--preset quick` for a zero-cost mock demo.
 - **CI/CD + feedback loop** — diff-only PR scans, DoS scope caps, SARIF 2.1.0 with taint `codeFlows`, PR comments with TP/FP checkboxes, a SQLite feedback loop folded into the next scan, and webhooks.
 - **Enterprise foundation** — multi-target batch intake (`--repo-file`) plus file-first CMDB / CVE-feed / control enrichment (asset criticality, CVE↔CWE correlation); _pipeline wiring in progress_.
+- **Verifiable, shareable outputs** — Markdown, self-contained **HTML** (verified/corroborated filters, triage-first order, per-stage cost table), **PDF**, SARIF 2.1.0, and flat **`findings.json` / `findings.csv`**. Every finding shows its deterministic **verification verdict** (K-of-N signals) so "verified" is auditable, not asserted. Regenerate any format from a past run with **`redeye report`** — no rescan, $0.
 - **Auditable by default** — every run writes `run_manifest.json`: tool version, profile, config hash, target SHA, and per-stage cost + quality metrics.
 
 ---
@@ -192,6 +193,41 @@ redeye scan --repo .  --strict-grounding         # drop findings with bad paths
 redeye scan --repo .  --require-poc              # drop findings without a runnable PoC
 ```
 
+## What's new -- verified, shareable outputs
+
+The deterministic S8c verification verdict is now **surfaced in every report**,
+not just computed internally -- so "validated & verified" is auditable per
+finding. Plus new ways to share and regenerate results without spending budget:
+
+- **Verification in every format.** Markdown (per-finding block + report-level
+  *Verification summary*), HTML (verdict badge + signal chips), PDF, and SARIF
+  (`properties.verification`) all show the K-of-N verdict and which independent
+  signals passed (grounding, taint, PoC, reachability, voting, external
+  corroboration).
+- **Richer, triage-first HTML report.** Full parity with Markdown (taint, PoC,
+  evidence trail, votes, CVSS), plus **Verified** / **Corroborated** filters,
+  verified+corroborated findings sorted first, and a per-stage cost/timing
+  table. Still a single self-contained file, zero external assets.
+- **`redeye report <manifest>`.** Regenerate any output
+  (`--format html|pdf|md|json|csv|all`) from an existing `run_manifest.json`
+  with **no rescan** ($0, offline). `--open` launches the HTML in a browser.
+- **Flat `findings.json` / `findings.csv`.** One row per finding (severity,
+  CWE, CVSS, confidence, verified/corroborated flags, location, remediation)
+  for dashboards, ticketing, and run-to-run diffs. Emitted by every scan.
+- **Opt-in LLM response cache** (`--cache` / `REDEYE_LLM_CACHE`). Caches
+  *deterministic* (temperature 0/None) completions on disk and reuses them on
+  re-runs; stochastic sampling (voting/self-consistency) is never cached, so
+  detection diversity is preserved. Cache hits report `$0` new spend.
+- **Eval gate in CI.** The bundled `ci` workflow runs `redeye eval` against the
+  labeled benchmark (uploading precision/recall/hallucination metrics) and
+  exercises `redeye report` in the smoke job.
+
+```bash
+redeye scan --repo . --cache                     # reuse deterministic LLM calls on re-runs
+redeye report --manifest ./out/run_manifest.json --format all --open
+redeye eval --profile mock --min-precision 0.8 --max-hallucination 0.1   # CI gate
+```
+
 ## Highlights -- the operational layer
 
 Operational layer (CI/CD + feedback):
@@ -209,8 +245,11 @@ Operational layer (CI/CD + feedback):
 - **CVSS** — every finding can carry a `cvss_vector` and `cvss_score`; SARIF emits both, plus `security-severity` for GitHub Code Scanning.
 - **New backends** — `bedrock` (AWS Claude), `vertex` (Gemini), `ollama` (local).
 - **Latest Anthropic models** — bundled `fable` profile using `claude-fable-5`, and `claude-opus-4-8` selectable per-role on the `sdk` backend (both priced in the cost table).
-- **Labeled-benchmark evaluation** — `redeye eval` scores a scan against ground truth (precision / recall / F1 / hallucination rate) with CI gates (`--min-precision`, `--min-recall`, `--max-hallucination`).
-- **HTML + PDF reports** — in addition to Markdown and SARIF, findings can be emitted as a self-contained HTML report and a PDF for sharing with non-CLI stakeholders.
+- **Labeled-benchmark evaluation** — `redeye eval` scores a scan against ground truth (precision / recall / F1 / hallucination rate) with CI gates (`--min-precision`, `--min-recall`, `--max-hallucination`), now wired into the `ci` workflow.
+- **HTML + PDF + flat exports** — besides Markdown and SARIF, findings emit as a self-contained interactive HTML report (verified/corroborated filters, triage-first order, per-stage cost table), a PDF for non-CLI stakeholders, and flat `findings.json` / `findings.csv`.
+- **`redeye report`** — regenerate any report format from an existing `run_manifest.json` with no rescan ($0); `--open` launches the HTML.
+- **Verification surfaced everywhere** — the deterministic S8c K-of-N verdict and its signals are rendered in Markdown/HTML/PDF and included in SARIF `properties.verification`.
+- **Opt-in LLM cache** — `--cache` (or `REDEYE_LLM_CACHE`) reuses deterministic completions across re-runs; stochastic sampling is never cached.
 
 Agentic pipeline (from the 0.1 / 0.2 base):
 

@@ -162,9 +162,20 @@ For each target, under `<output_dir>/`:
 <module>_<timestamp>_report.md       # Markdown, human-readable
 <module>_<timestamp>_report.sarif    # SARIF 2.1.0
 <module>_<timestamp>_errors.jsonl    # one error per line, if any
+findings.json                        # flat, one row per finding
+findings.csv                         # same, for spreadsheets / ticketing
+report.html                          # self-contained HTML (with --html)
+report.pdf                           # styled PDF (with --pdf)
 run_manifest.json                    # canonical run record
 run_manifest_<timestamp>.json        # archived copy of the same
 ```
+
+Each finding surfaces its deterministic **verification verdict** (S8c: a
+K-of-N vote over grounding, taint, PoC, reachability, voting, and external-tool
+corroboration) in the Markdown, HTML, PDF, and SARIF outputs, plus
+`verified` / `externally_corroborated` columns in `findings.json` / `.csv`.
+The HTML report adds **Verified** / **Corroborated** filters and sorts
+verified+corroborated findings first.
 
 The manifest contains, at minimum:
 
@@ -177,6 +188,39 @@ The manifest contains, at minimum:
 
 Use it as the audit trail for any compliance program that asks "what
 exactly did you scan, with which model, when, and at what cost".
+
+## `redeye report`
+
+Regenerate report(s) from an existing `run_manifest.json` -- no rescan, so it
+costs nothing and runs offline. Useful to add HTML/PDF after a scan, refresh
+formatting, or produce a shareable artifact from a past run.
+
+```bash
+# Auto-detects ./run_manifest.json, ./security-scan/, or ./out/
+redeye report --format all
+
+# Explicit manifest + open the HTML in a browser
+redeye report --manifest ./out/run_manifest.json --format html --open
+
+# Just the flat exports for a dashboard
+redeye report --manifest ./out/run_manifest.json --format json --format csv
+```
+
+| Flag | Notes |
+|---|---|
+| `--manifest PATH` | Manifest to render (default: common output locations). |
+| `--output-dir DIR` | Where to write (default: alongside the manifest). |
+| `--format` | `html`, `pdf`, `md`, `json`, `csv`, or `all` (repeatable). |
+| `--open` | Launch the HTML report in the default browser. |
+
+## LLM response cache (`--cache`)
+
+`redeye scan --cache` (or setting `REDEYE_LLM_CACHE=<dir>`) caches
+*deterministic* LLM completions (temperature 0/None) on disk and reuses them on
+later runs, cutting cost on CI re-runs and iterative development. Stochastic
+sampling (multi-agent voting / self-consistency) is **never** cached, so
+detection diversity is preserved; cache hits report `$0` new spend. Off by
+default. Default cache dir: `~/.redeye/llm-cache`; override with `--cache-dir`.
 
 ## Running with an AI agent
 
