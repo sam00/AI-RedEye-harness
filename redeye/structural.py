@@ -697,13 +697,14 @@ def maybe_ast_routes(target: Path, file_paths: list[Path]) -> list[StructuralHit
                 attr = getattr(func, "attr", None)
                 if attr in {"get", "post", "put", "delete", "patch"}:
                     if deco.args and isinstance(deco.args[0], ast.Constant):
+                        route_path = str(deco.args[0].value)
                         out.append(
                             StructuralHit(
                                 rel,
                                 deco.lineno,
                                 "route",
                                 "ast/python_decorator",
-                                f"{attr.upper()} {deco.args[0].value}",
+                                f"{attr.upper()} {route_path}",
                             )
                         )
     return out

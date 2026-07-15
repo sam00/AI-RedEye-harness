@@ -94,3 +94,10 @@ ignore = ["E501"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-ra --strict-markers"
+
+[tool.mypy]
+python_version = "3.10"
+
+[[tool.mypy.overrides]]
+module = ["yaml", "reportlab", "reportlab.*"]
+ignore_missing_imports = true

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from redeye.schema import RunManifest
 
@@ -33,7 +34,7 @@ def write_manifest(output_dir: Path, manifest: RunManifest, *, redact: bool = Tr
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archived = output_dir / f"run_manifest_{timestamp}.json"
 
-    payload = manifest.model_dump(mode="json")
+    payload: Any = manifest.model_dump(mode="json")
     if redact:
         from redeye.redaction import redact_obj
 

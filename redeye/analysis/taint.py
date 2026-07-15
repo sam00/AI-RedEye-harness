@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import ast
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -444,7 +445,7 @@ class TaintTracer:
 
     def _propagate_assign(
         self,
-        targets: list[ast.AST],
+        targets: Sequence[ast.AST],
         value: ast.AST,
         tainted: dict[str, TaintStep],
         *,

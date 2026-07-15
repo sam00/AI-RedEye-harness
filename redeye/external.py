@@ -250,6 +250,7 @@ def _parse_semgrep(data: dict) -> list[ExternalFinding]:
             return []  # not actually semgrep; let the generic parser try
         extra = r.get("extra") or {}
         meta = extra.get("metadata") or {}
+        end_line_no = (r.get("end") or {}).get("line")
         out.append(
             ExternalFinding(
                 tool="semgrep",
@@ -257,9 +258,7 @@ def _parse_semgrep(data: dict) -> list[ExternalFinding]:
                 message=str(extra.get("message", "")),
                 path=_norm_path(str(r.get("path", ""))),
                 start_line=int((r.get("start") or {}).get("line", 1) or 1),
-                end_line=int((r.get("end") or {}).get("line"))
-                if (r.get("end") or {}).get("line")
-                else None,
+                end_line=int(end_line_no) if end_line_no else None,
                 severity=_norm_severity(extra.get("severity")),
                 cwe=_cwe_from_tags(meta.get("cwe")),
             )

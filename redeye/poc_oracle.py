@@ -96,11 +96,10 @@ def _cmd(payload: str) -> OracleVerdict:
     meta = _CMD_METACHARS.search(payload)
     verb = _CMD_VERB.search(payload)
     demonstrated = bool(meta and verb)
-    reason = (
-        f"metachar={meta.group(0)!r} reaches command {verb.group(0)!r}"
-        if demonstrated
-        else "no shell metacharacter chaining a command was found"
-    )
+    if meta and verb:
+        reason = f"metachar={meta.group(0)!r} reaches command {verb.group(0)!r}"
+    else:
+        reason = "no shell metacharacter chaining a command was found"
     return OracleVerdict("CWE-78", demonstrated, "command_injection", reason)
 
 
