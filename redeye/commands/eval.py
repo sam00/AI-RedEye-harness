@@ -110,6 +110,7 @@ def run(
             console=console,
             target=bench_dir,
             output_dir=Path(tmp),
+            application_id=None,
             scope=scope,
         )
         manifest = orchestrator.run()

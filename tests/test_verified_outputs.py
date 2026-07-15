@@ -152,6 +152,31 @@ def test_report_command_missing_manifest(tmp_path: Path) -> None:
     assert rc.exit_code == 2
 
 
+# --- eval command (regression: Orchestrator needs application_id) -----------
+
+
+def test_eval_command_runs_and_writes_metrics(tmp_path: Path) -> None:
+    out_json = tmp_path / "eval.json"
+    rc = CliRunner().invoke(
+        main,
+        [
+            "eval",
+            "--profile",
+            "mock",
+            "--max-hallucination",
+            "1.0",
+            "--output-json",
+            str(out_json),
+        ],
+    )
+    # Must not crash (previously raised TypeError: missing application_id).
+    assert rc.exit_code == 0, rc.output
+    assert out_json.is_file()
+    metrics = json.loads(out_json.read_text(encoding="utf-8"))
+    for key in ("precision", "recall", "f1", "hallucination_rate", "total_predicted"):
+        assert key in metrics
+
+
 # --- opt-in LLM cache -------------------------------------------------------
 
 
