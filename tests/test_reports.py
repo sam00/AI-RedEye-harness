@@ -53,6 +53,23 @@ _MANIFEST = {
                     "tags": ["deterministic"],
                     "locations": [{"path": "app/x.py", "start_line": 5}],
                     "remediation": "use params",
+                    "externally_corroborated": True,
+                    "corroborating_tools": ["semgrep"],
+                    "verification": {
+                        "verified": True,
+                        "score": 0.83,
+                        "signals": {
+                            "grounded": True,
+                            "taint_complete": True,
+                            "concrete_poc": False,
+                            "reachable": True,
+                            "vote_confirmed": True,
+                            "externally_corroborated": True,
+                        },
+                        "threshold": 3,
+                        "method": "deterministic",
+                        "rationale": "5/6 independent signals passed (need 3).",
+                    },
                 }
             ],
         },
@@ -77,6 +94,20 @@ def test_html_report_is_self_contained(tmp_path: Path) -> None:
     # No external asset references.
     assert "http://" not in text and "https://" not in text
     assert "<script>" in text  # interactive filtering inlined
+
+
+def test_html_report_surfaces_verification(tmp_path: Path) -> None:
+    manifest = _write_manifest(tmp_path)
+    out = tmp_path / "report.html"
+    render_manifest_html(manifest, out, target_name="demo")
+    text = out.read_text(encoding="utf-8")
+    # Verification verdict + triage data attributes + new filters are present.
+    assert "VERIFIED" in text
+    assert 'data-verified="true"' in text
+    assert 'data-corroborated="true"' in text
+    assert 'id="verified"' in text and 'id="corrob"' in text
+    assert "Verification (S8c)" in text
+    assert "Pipeline stages" in text  # per-stage cost table
 
 
 def test_pdf_report_renders(tmp_path: Path) -> None:

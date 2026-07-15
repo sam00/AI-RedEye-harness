@@ -188,10 +188,22 @@ def render_manifest_pdf(
     # Executive summary + severity table
     story.append(Paragraph("Executive summary", st["h2"]))
     crit = by_sev.get("critical", 0) + by_sev.get("high", 0)
+    verified_n = sum(1 for f in findings if (f.get("verification") or {}).get("verified"))
+    corroborated_n = sum(
+        1
+        for f in findings
+        if f.get("externally_corroborated")
+        or any(
+            e.get("check") == "pass" and e.get("kind") == "external_corroboration"
+            for e in (f.get("evidence") or [])
+        )
+    )
     story.append(
         Paragraph(
             f"The harness emitted <b>{len(findings)}</b> finding(s), of which "
-            f"<b>{crit}</b> are Critical/High.",
+            f"<b>{crit}</b> are Critical/High. "
+            f"<b>{verified_n}</b> passed deterministic outcome verification (S8c) and "
+            f"<b>{corroborated_n}</b> were corroborated by an independent scanner.",
             st["body"],
         )
     )
@@ -258,12 +270,23 @@ def render_manifest_pdf(
                     st["h3"],
                 )
             )
+            ver = f.get("verification") or {}
+            if ver:
+                passed = sum(1 for ok in (ver.get("signals") or {}).values() if ok)
+                considered = len(ver.get("signals") or {})
+                verdict = (
+                    f"{'VERIFIED' if ver.get('verified') else 'UNVERIFIED'} "
+                    f"({passed}/{considered} signals, need {ver.get('threshold', 3)})"
+                )
+            else:
+                verdict = "not run"
             story.append(
                 kv(
                     [
                         ("CWE", f.get("cwe", "unknown")),
                         ("Location", f"{loc.get('path', '?')}:{loc.get('start_line', '?')}"),
                         ("Confidence", f"{f.get('confidence', 0):.2f}"),
+                        ("Verification (S8c)", verdict),
                         ("Lens / stage", f"{f.get('skill', '-')} / {f.get('stage', '-')}"),
                     ]
                 )

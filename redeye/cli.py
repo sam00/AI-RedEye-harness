@@ -348,6 +348,21 @@ def eval_cmd(
     help="Prior run_manifest.json to diff against (default: <output-dir>/run_manifest.json).",
 )
 @click.option(
+    "--cache",
+    is_flag=True,
+    help=(
+        "Cache deterministic (temperature 0/None) LLM completions on disk and reuse "
+        "them on re-runs. Stochastic sampling (voting/self-consistency) is never cached. "
+        "Off by default; also enabled by REDEYE_LLM_CACHE=<dir>."
+    ),
+)
+@click.option(
+    "--cache-dir",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Directory for the LLM response cache (default: ~/.redeye/llm-cache).",
+)
+@click.option(
     "--preset",
     type=click.Choice(["pr", "ci", "deep", "quick"]),
     default=None,
@@ -416,6 +431,8 @@ def scan(
     max_cost: float,
     incremental: bool,
     incremental_from: str | None,
+    cache: bool,
+    cache_dir: str | None,
     preset: str | None,
 ) -> None:
     """Run the full 9-stage pipeline against one or more repositories."""
@@ -507,11 +524,57 @@ def scan(
             max_cost=max_cost,
             incremental=incremental,
             incremental_from=incremental_from,
+            cache=cache,
+            cache_dir=Path(cache_dir) if cache_dir else None,
         )
         sys.exit(rc)
     except RedEyeError as exc:
         console.print(f"[red]scan failed:[/red] {exc}")
         sys.exit(2)
+
+
+@main.command("report")
+@click.option(
+    "--manifest",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="run_manifest.json to render (default: ./run_manifest.json, ./security-scan/, or ./out/).",
+)
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Where to write reports (default: alongside the manifest).",
+)
+@click.option(
+    "--format",
+    "formats",
+    multiple=True,
+    type=click.Choice(["html", "pdf", "md", "json", "csv", "all"]),
+    default=("html",),
+    show_default=True,
+    help="Report format(s) to emit (repeatable). 'all' emits every format.",
+)
+@click.option("--open", "open_report", is_flag=True, help="Open the HTML report in a browser.")
+@click.pass_context
+def report(
+    ctx: click.Context,
+    manifest: str | None,
+    output_dir: str | None,
+    formats: tuple[str, ...],
+    open_report: bool,
+) -> None:
+    """Regenerate reports (HTML/PDF/Markdown/JSON/CSV) from a manifest -- no rescan, $0."""
+    from redeye.commands.report import run as run_report
+
+    rc = run_report(
+        console=ctx.obj["console"],
+        manifest=Path(manifest) if manifest else None,
+        output_dir=Path(output_dir) if output_dir else None,
+        formats=list(formats),
+        open_report=open_report,
+    )
+    sys.exit(rc)
 
 
 @main.command("init")

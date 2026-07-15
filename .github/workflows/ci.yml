@@ -60,8 +60,37 @@ jobs:
       - run: redeye doctor --profile mock --no-network
       - run: redeye estimate --repo . --profile mock
       - run: redeye scan --repo . --profile mock --output-dir ./out
+      - name: Regenerate reports from manifest (no rescan)
+        run: redeye report --manifest ./out/run_manifest.json --format all --output-dir ./out
+      - name: Assert flat exports exist
+        run: test -f ./out/findings.json && test -f ./out/findings.csv
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: smoke-output
           path: out/
+
+  eval:
+    name: labeled eval gate (mock backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      # Runs the bundled benchmark and records precision/recall/hallucination.
+      # Thresholds are intentionally permissive on the mock backend; tighten
+      # (e.g. --min-precision 0.8 --max-hallucination 0.1) once measured on a
+      # real backend so a regression fails the build.
+      - name: Eval
+        run: >-
+          redeye eval --profile mock
+          --max-hallucination 1.0
+          --output-json ./eval-metrics.json
+      - name: Upload eval metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-metrics
+          path: eval-metrics.json

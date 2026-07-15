@@ -58,6 +58,44 @@ def _render_evidence(f: Finding) -> str:
     return "\n".join(rows)
 
 
+_SIGNAL_LABELS = {
+    "grounded": "grounded",
+    "taint_complete": "taint",
+    "concrete_poc": "PoC",
+    "reachable": "reachable",
+    "vote_confirmed": "voted",
+    "externally_corroborated": "corroborated",
+}
+
+
+def _render_verification(f: Finding) -> str:
+    v = f.verification
+    if v is None:
+        return "_(no outcome verification ran -- S8c disabled for this profile)_"
+    passed = sum(1 for ok in v.signals.values() if ok)
+    considered = len(v.signals)
+    verdict = "[VERIFIED]" if v.verified else "[UNVERIFIED]"
+    chips = "  ".join(
+        f"{'[x]' if v.signals.get(k) else '[ ]'} {label}"
+        for k, label in _SIGNAL_LABELS.items()
+        if k in v.signals
+    )
+    lines = [
+        f"- **Verdict:** {verdict} "
+        f"(score {v.score:.2f}; {passed}/{considered} signals passed, need {v.threshold})",
+        f"- **Signals:** {chips}" if chips else "- **Signals:** _(none recorded)_",
+    ]
+    if v.rationale:
+        lines.append(f"- **Rationale:** {v.rationale}")
+    if f.corroborating_tools:
+        lines.append(f"- **Corroborated by:** {', '.join(f.corroborating_tools)}")
+    if f.calibrated_confidence is not None:
+        lines.append(f"- **Calibrated confidence:** {f.calibrated_confidence:.2f}")
+    if f.abstained:
+        lines.append("- **Abstained:** borderline -- routed to human review, not asserted.")
+    return "\n".join(lines)
+
+
 def _render_poc(f: Finding) -> str:
     if f.poc is None:
         return "_(no PoC stage ran)_"
@@ -123,6 +161,10 @@ def _render_finding(f: Finding) -> str:
         "",
         _render_poc(f),
         "",
+        "**Verification (S8c):**",
+        "",
+        _render_verification(f),
+        "",
         "**Evidence collected:**",
         "",
         _render_evidence(f),
@@ -177,6 +219,32 @@ def write_markdown_report(
         lines.append(f"| {sev.value} | {len(by_sev[sev])} |")
     lines.extend(["", "---", ""])
 
+    # Verification summary (S8c): how many findings cleared the deterministic
+    # K-of-N outcome verdict, and how many an independent scanner corroborated.
+    # These are the numbers that make "validated & verified" auditable.
+    verified = sum(1 for f in findings if f.verification and f.verification.verified)
+    corroborated = sum(1 for f in findings if f.has_external_corroboration())
+    abstained = sum(1 for f in findings if f.abstained)
+    if findings:
+        lines.extend(
+            [
+                "## Verification summary (S8c)",
+                "",
+                "Deterministic outcome verification cross-checks each finding against "
+                "independent signals (grounding, taint, PoC, reachability, voter agreement, "
+                "external-tool corroboration). Prioritise **verified** findings for triage.",
+                "",
+                "| Metric | Count |",
+                "|---|---|",
+                f"| Verified (passed K-of-N) | {verified} / {len(findings)} |",
+                f"| Externally corroborated | {corroborated} / {len(findings)} |",
+                f"| Abstained (routed to human) | {abstained} / {len(findings)} |",
+                "",
+                "---",
+                "",
+            ]
+        )
+
     if hallucination_metrics:
         # Surface what the pipeline filtered. Operators trust the report more
         # when they can see the harness pruning its own noise.
@@ -199,6 +267,9 @@ def write_markdown_report(
             "validator_rejected": "Rejected by single-pass validator (S6.5)",
             "voted_out": "Voted out by multi-agent vote (S6)",
             "missing_poc": "Demoted: no concrete PoC (S8b)",
+            "outcome_unverified": "Flagged: failed K-of-N outcome verdict (S8c)",
+            "outcome_unverified_dropped": "Dropped: unverified under --require-verified (S8c)",
+            "baseline_filtered": "Suppressed: already accepted in baseline",
         }
         for key, label in labels.items():
             if key in hallucination_metrics:

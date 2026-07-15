@@ -8,6 +8,36 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Verification surfaced in every report.** The deterministic S8c outcome
+  verdict (K-of-N over grounding, taint, PoC, reachability, voting, external
+  corroboration) — already computed per finding — is now rendered in the
+  Markdown (per-finding block + report-level *Verification summary*), the
+  interactive HTML (verdict badge + signal chips), the PDF, and SARIF
+  (`properties.verification`). Makes "validated & verified" auditable rather
+  than asserted. Quality-metrics table now also reports `outcome_unverified`,
+  `outcome_unverified_dropped`, and `baseline_filtered`.
+- **Richer, triage-first HTML report.** The self-contained HTML now reaches
+  Markdown parity (taint flow, PoC, evidence trail, votes, CVSS, verification
+  signals), adds **Verified** and **Corroborated** filters, sorts
+  verified+corroborated findings first, and includes a per-stage cost/timing
+  table. Still zero external assets.
+- **`redeye report <manifest>` command.** Regenerate any output format
+  (`--format html|pdf|md|json|csv|all`) from an existing `run_manifest.json`
+  with **no rescan** ($0, offline); `--open` launches the HTML in a browser.
+  New module `redeye/commands/report.py`.
+- **Flat `findings.json` / `findings.csv` export.** One-row-per-finding view
+  (severity, CWE, CVSS, confidence, verified/corroborated flags, location,
+  remediation) for dashboards, ticketing, and run-to-run diffs. Emitted by
+  every `scan` and by `report`. New module `redeye/output/findings_export.py`.
+- **Opt-in LLM response cache (`--cache` / `REDEYE_LLM_CACHE`).** Caches
+  *deterministic* (temperature 0/None) completions on disk and reuses them on
+  re-runs; stochastic sampling (voting/self-consistency) is never cached, so
+  diversity is preserved. Cache hits report `$0` new spend. Off by default.
+  New module `redeye/llm_cache.py`.
+- **Labeled eval gate in CI.** The `ci` workflow now runs `redeye eval`
+  against the bundled benchmark (uploading precision/recall/hallucination
+  metrics) and exercises `redeye report --format all` in the smoke job.
+
 - **Claude Fable 5 support.** New bundled `fable` profile routes the heavy
   research and adversarial stages through `claude-fable-5` on the `sdk`
   backend (cheap stages stay Haiku-class). Fable 5 pricing ($10/$50 per

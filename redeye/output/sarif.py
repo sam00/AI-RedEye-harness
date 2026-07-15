@@ -136,6 +136,24 @@ def build_sarif_log(*, target: Path, findings: list[Finding]) -> dict:
                 "invocation": f.poc.invocation[:1500],
                 "expected_effect": f.poc.expected_effect,
             }
+        # Outcome verification (S8c) + corroboration/calibration, so SARIF
+        # consumers can filter/sort on the deterministic verdict too.
+        if f.verification is not None:
+            properties["verification"] = {
+                "verified": f.verification.verified,
+                "score": f.verification.score,
+                "signals": f.verification.signals,
+                "threshold": f.verification.threshold,
+                "method": f.verification.method,
+            }
+        if f.has_external_corroboration():
+            properties["externally_corroborated"] = True
+            if f.corroborating_tools:
+                properties["corroborating_tools"] = f.corroborating_tools
+        if f.calibrated_confidence is not None:
+            properties["calibrated_confidence"] = f.calibrated_confidence
+        if f.abstained:
+            properties["abstained"] = True
 
         # Build a SARIF codeFlow if we have at least source -> sink locations.
         # codeFlows let GitHub render a taint-trace inline.

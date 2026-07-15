@@ -180,8 +180,23 @@ def run(
     max_cost: float = 0.0,
     incremental: bool = False,
     incremental_from: str | None = None,
+    cache: bool = False,
+    cache_dir: Path | None = None,
 ) -> int:
     cfg = load_profile(profile)
+    # Resolve the opt-in LLM response cache directory (flag or env). None = off.
+    import os
+
+    llm_cache_dir: Path | None = None
+    if cache or cache_dir or os.environ.get("REDEYE_LLM_CACHE"):
+        llm_cache_dir = (
+            cache_dir
+            or (
+                Path(os.environ["REDEYE_LLM_CACHE"]) if os.environ.get("REDEYE_LLM_CACHE") else None
+            )
+            or (Path.home() / ".redeye" / "llm-cache")
+        )
+        console.print(f"[dim]LLM cache: {llm_cache_dir} (deterministic calls only)[/dim]")
     # Honor --strict-grounding / --require-poc by patching the stage params
     # at runtime. Profiles can also pre-set these; CLI flags win.
     if strict_grounding and "s4b_grounding" in cfg.stages:
@@ -284,6 +299,7 @@ def run(
             external_scans=list(external_scans or []),
             file_hashes=file_hashes,
             max_budget_usd=max_cost,
+            llm_cache_dir=llm_cache_dir,
         )
         try:
             manifest = orchestrator.run()
@@ -301,6 +317,17 @@ def run(
 
         # Optional self-contained HTML + styled PDF, built from the manifest.
         manifest_path = target_out / "run_manifest.json"
+
+        # Flat findings.json / findings.csv for dashboards, tickets, and diffs.
+        # Cheap, always useful, and built from the (already-redacted) manifest.
+        try:
+            from redeye.output.findings_export import export_findings
+
+            fj, fc = export_findings(manifest_path, target_out)
+            console.print(f"  [dim]wrote {fj.name} + {fc.name}[/dim]")
+        except (OSError, ValueError) as exc:
+            console.print(f"  [yellow]findings export skipped: {exc}[/yellow]")
+
         if emit_html:
             from redeye.output.html import render_manifest_html
 

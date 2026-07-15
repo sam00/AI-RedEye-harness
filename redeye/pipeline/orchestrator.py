@@ -94,11 +94,19 @@ class StageContext:
     custom_prompt: str = ""
     feedback: list[dict[str, Any]] = field(default_factory=list)
     external_scans: list[str] = field(default_factory=list)
+    llm_cache_dir: Path | None = None
 
     def get_backend(self, role_name: str) -> tuple[BackendBase, str, float | None, int]:
         role = self.profile.roles[role_name]
         factory = BACKENDS[role.via]
         backend = factory({})
+        if self.llm_cache_dir is not None:
+            # Opt-in: wrap in the on-disk cache. Only deterministic calls
+            # (temperature 0/None) are served from cache; stochastic sampling
+            # bypasses it, so voting/self-consistency diversity is preserved.
+            from redeye.llm_cache import CachingBackend
+
+            backend = CachingBackend(backend, self.llm_cache_dir)
         return backend, role.model, role.temperature, role.max_tokens
 
 
@@ -118,6 +126,7 @@ class Orchestrator:
         external_scans: list[str] | None = None,
         file_hashes: dict[str, str] | None = None,
         max_budget_usd: float = 0.0,
+        llm_cache_dir: Path | None = None,
     ) -> None:
         self.config = config
         self.console = console
@@ -131,6 +140,7 @@ class Orchestrator:
         self.external_scans = external_scans or []
         self.file_hashes = file_hashes or {}
         self.max_budget_usd = max_budget_usd or 0.0
+        self.llm_cache_dir = llm_cache_dir
 
     def _resolve_target_sha(self) -> str | None:
         try:
@@ -172,6 +182,7 @@ class Orchestrator:
             custom_prompt=self.custom_prompt,
             feedback=self.feedback,
             external_scans=self.external_scans,
+            llm_cache_dir=self.llm_cache_dir,
         )
 
         all_findings: list[Finding] = []
