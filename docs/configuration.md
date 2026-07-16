@@ -20,10 +20,10 @@ loaded -- the printed `source_path` is the file the loader picked.
 
 | Name | Backend(s) | Models | Notes |
 |---|---|---|---|
-| `default` | `cli` | claude-sonnet-4-6 | Laptop/interactive; no API key. Single-pass. |
-| `full` | `sdk` + `cli` + `openai` | Haiku / Sonnet / GPT-4o | Multi-backend with cross-family voting. |
-| `fable` | `sdk` | claude-fable-5 (heavy) + claude-haiku-4 (cheap) | Highest-capability; needs `ANTHROPIC_API_KEY` + `redeye[sdk]`. |
-| `cli` | `cli` | claude-sonnet-4-6 | Minimal CLI-only profile. |
+| `default` | `cli` | claude-sonnet-5 | Laptop/interactive; no API key. Single-pass. |
+| `full` | `sdk` + `cli` + `openai` | Haiku 4.5 / Sonnet 5 / GPT-4o | Multi-backend with cross-family voting. |
+| `fable` | `sdk` | claude-fable-5 (heavy) + claude-haiku-4-5 (cheap) | Highest-capability; needs `ANTHROPIC_API_KEY` + `redeye[sdk]`. |
+| `cli` | `cli` | claude-sonnet-5 | Minimal CLI-only profile. |
 | `mock` | `mock` | deterministic | Zero-cost; CI and demos. |
 
 Selecting Fable 5: `redeye scan --repo . --profile fable`. It routes the
@@ -31,6 +31,12 @@ research and adversarial stages through Claude Fable 5 and the cheap
 survey/report/validation stages through a Haiku-class model. Alternatively,
 `REDEYE_PREFER_QUALITY=1` upgrades the auto profile's SDK model to
 `claude-fable-5` without picking a named profile.
+
+**Additional models** (set per-role in any profile's `model:` field): OpenAI
+`gpt-5.5`, `gpt-5.5-cyber`, `gpt-5.6`, `gpt-5.6-sol` on the `openai` backend, and
+Anthropic `claude-opus-4-8` on the `sdk` backend — all priced in their cost
+tables. Any OpenAI-compatible model string also works (unpriced ones fall back
+to the `gpt-4o` rate for cost estimation).
 
 ## Profile schema
 
@@ -40,14 +46,14 @@ name: my-profile               # arbitrary string
 roles:                          # logical role -> backend assignment
   surveyor:
     via: cli                    # cli | sdk | openai | mock
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     temperature: 0.0            # optional; some backends ignore
     max_tokens: 4096
     extra: { tools: [Read, Bash] }   # backend-specific options
 
   researcher:
     via: sdk
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     temperature: 0.2
 
   adversary:
@@ -57,7 +63,7 @@ roles:                          # logical role -> backend assignment
 
   reporter:
     via: cli
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
 
 stages:                         # stage_id -> stage config
   s1_attack_surface:

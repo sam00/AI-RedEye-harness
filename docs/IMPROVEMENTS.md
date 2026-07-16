@@ -60,11 +60,11 @@ completes.
 
 | Backend (`via`) | Provider | Models with first-class pricing/wiring |
 |---|---|---|
-| `sdk` | Anthropic API | **`claude-opus-4-8`**, `claude-opus-4-7`, `claude-fable-5`, `claude-sonnet-4-6`, `claude-haiku-4` |
-| `cli` | Claude Code CLI | `claude-sonnet-4-6` |
+| `sdk` | Anthropic API | **`claude-opus-4-8`**, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5-20251001` |
+| `cli` | Claude Code CLI | `claude-sonnet-5` |
 | `bedrock` | AWS Bedrock | `anthropic.claude-opus-4-5`, `claude-3-5-sonnet`, `claude-3-haiku` |
 | `vertex` | Google Vertex AI | `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-1.5-pro` |
-| `openai` | OpenAI / OpenAI-compatible | `gpt-4o`, `gpt-4o-mini` |
+| `openai` | OpenAI / OpenAI-compatible | `gpt-4o`, `gpt-4o-mini`, `gpt-5.5`, `gpt-5.5-cyber`, `gpt-5.6`, `gpt-5.6-sol` |
 | `ollama` | Local Ollama | `qwen2.5-coder`, any local model |
 | `mock` | none (deterministic) | `mock-deep`, `mock-fast` |
 
