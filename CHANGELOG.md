@@ -118,6 +118,14 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   voter crash degrades to "unvoted" instead of aborting the run.
 
 ### Fixed
+- **Structural pre-index flagged comment-only lines.** The S1b scanner matched
+  sink/source/secret regexes anywhere on a line, so security patterns appearing
+  inside comments (example code in docstrings, commented-out code, or the
+  detector's own rule comments when the harness scans itself) produced false
+  positives. Comment-only lines (`#`, `//`, `/*`, `<!--`) are now skipped before
+  matching; trailing comments are deliberately *not* stripped so a `#`/`//`
+  inside a string literal (e.g. a URL in an SSRF sink) is still detected.
+  Regression test added.
 - **`redeye eval` crash.** The command constructed `Orchestrator` without the
   required `application_id`; now passed through, with a regression test.
 - **AST grounding proximity window.** `sink_call_on_line` now defaults to a

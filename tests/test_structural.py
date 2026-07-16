@@ -53,3 +53,35 @@ def test_index_finds_route_sink_secret(tmp_path: Path) -> None:
     assert "subprocess_shell_true" in sink_kinds
     # Secret
     assert any(h.kind == "anthropic_or_openai_key" for h in idx.secrets)
+
+
+def test_comment_only_lines_are_not_flagged(tmp_path: Path) -> None:
+    """Patterns matching inside comment-only lines are false positives.
+
+    Regression for the self-scan issue where the detector flagged security
+    patterns appearing in comments (example code in docstrings, commented-out
+    code, or -- when the harness scans itself -- a rule's own comment). Real
+    executable code on the same file must still be detected.
+    """
+    src = (
+        '# password = "supersecret"\n'  # 1: secret in comment -> skip
+        "# cursor.execute(userq)\n"  # 2: SQL sink in comment -> skip
+        "    # os.system(cmd)\n"  # 3: indented comment sink -> skip
+        "// eval(userInput)\n"  # 4: C-family comment sink -> skip
+        "x = 1\n"  # 5: benign
+        'password = "realsecret123"\n'  # 6: real secret -> flag
+        "os.system(realcmd)\n"  # 7: real sink -> flag
+    )
+    f = tmp_path / "mixed.py"
+    f.write_text(src, encoding="utf-8")
+
+    idx = build_index(target=tmp_path, file_paths=[f])
+
+    commented_lines = {1, 2, 3, 4}
+    flagged_lines = {h.line for h in idx.sinks} | {h.line for h in idx.secrets}
+    assert not (flagged_lines & commented_lines), (
+        f"comment-only lines were flagged: {sorted(flagged_lines & commented_lines)}"
+    )
+    # Real code on non-comment lines must still be detected.
+    assert any(h.kind == "os_system" and h.line == 7 for h in idx.sinks)
+    assert any(h.line == 6 for h in idx.secrets)

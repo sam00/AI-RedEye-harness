@@ -362,6 +362,23 @@ def _short_snippet(text: str, line_idx: int, *, context: int = 0) -> str:
     return "\n".join(lines[start:end])[:1500]
 
 
+# Lines that are *only* a comment cannot execute, so a sink/source/secret
+# pattern matching inside one is always a false positive -- an example in a
+# docstring/comment, commented-out code, or (when the harness scans its own
+# source) a rule's own descriptive comment. Language-agnostic prefixes cover
+# the languages our catalog targets: Python/shell/YAML ``#``, C-family ``//``
+# and ``/*``, and HTML ``<!--``. We only skip *comment-only* lines and never
+# strip trailing comments, because ``#``/``//`` can legitimately appear inside
+# a string literal on a code line (e.g. a URL ``"http://..."`` that the SSRF
+# sink patterns must still see).
+_COMMENT_PREFIXES: tuple[str, ...] = ("#", "//", "/*", "<!--")
+
+
+def _is_comment_only_line(line: str) -> bool:
+    """True if ``line`` (ignoring indentation) is a single-line comment."""
+    return line.lstrip().startswith(_COMMENT_PREFIXES)
+
+
 def build_index(*, target: Path, file_paths: list[Path]) -> StructuralIndex:
     """Scan ``file_paths`` (already filtered by Scope) and return the index."""
     idx = StructuralIndex()
@@ -378,6 +395,12 @@ def build_index(*, target: Path, file_paths: list[Path]) -> StructuralIndex:
         )
 
         for line_no, line in enumerate(text.splitlines(), start=1):
+            # A pattern hit inside a comment-only line is never a real,
+            # executable sink/source/secret -- skip it to cut false positives
+            # (e.g. example code in docstrings, or the detector's own rule
+            # comments when the harness scans itself).
+            if _is_comment_only_line(line):
+                continue
             # routes
             for pat, lang in _ROUTE_PATTERNS:
                 m = pat.search(line)
