@@ -11,19 +11,19 @@ name: default
 roles:
   surveyor:
     via: cli
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     max_tokens: 4096
   researcher:
     via: cli
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     max_tokens: 8192
   adversary:
     via: cli
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     max_tokens: 8192
   reporter:
     via: cli
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     max_tokens: 4096
 
 stages:

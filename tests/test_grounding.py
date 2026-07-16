@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from redeye.ast_grounding import sink_call_on_line
 from redeye.grounding import ground_findings, ground_one
 from redeye.schema import Finding, Location, Severity
 
@@ -79,3 +80,36 @@ def test_non_strict_grounding_keeps_but_tags(tmp_path: Path) -> None:
     assert len(kept) == 1
     assert dropped == []
     assert "hallucinated:bad-path" in kept[0].tags
+
+
+def test_ast_ambiguous_names_require_name_qualification() -> None:
+    # Bare / literal-receiver calls to ambiguous sink names prove nothing...
+    assert sink_call_on_line('csv = ",".join(parts)\n', 1, "CWE-22") is False
+    assert sink_call_on_line("data = get(url)\n", 1, "CWE-918") is False
+    # ...while name-qualified calls still count.
+    assert sink_call_on_line("p = os.path.join(base, name)\n", 1, "CWE-22") is True
+    assert sink_call_on_line("r = requests.get(url)\n", 1, "CWE-918") is True
+    # Unambiguous names keep matching even as bare calls.
+    assert sink_call_on_line("execute(q)\n", 1, "CWE-89") is True
+
+
+def test_bare_join_is_not_ast_grounded_for_cwe22(tmp_path: Path) -> None:
+    f_path = tmp_path / "j.py"
+    f_path.write_text('parts = ["a", "b"]\ncsv = ",".join(parts)\n', encoding="utf-8")
+    finding = _f("j.py", 2, cwe="CWE-22")
+    ground_one(finding=finding, target=tmp_path)
+    kinds = {(e.kind, e.check) for e in finding.evidence}
+    # The AST must not treat a bare ``",".join(...)`` as a CWE-22 sink call;
+    # the coarse token check may still apply, but no AST rescue happens.
+    assert ("ast_sink_match", "fail") in kinds
+    assert ("ast_sink_match", "pass") not in kinds
+
+
+def test_qualified_join_still_ast_grounds_cwe22(tmp_path: Path) -> None:
+    f_path = tmp_path / "p.py"
+    f_path.write_text("import os\np = os.path.join(base, user_name)\n", encoding="utf-8")
+    finding = _f("p.py", 2, cwe="CWE-22")
+    ground_one(finding=finding, target=tmp_path)
+    kinds = {(e.kind, e.check) for e in finding.evidence}
+    assert ("ast_sink_match", "pass") in kinds
+    assert finding.grounded is True

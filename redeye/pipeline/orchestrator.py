@@ -9,6 +9,7 @@ the skills evolve.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import time
 from collections.abc import Callable
@@ -22,6 +23,7 @@ from rich.console import Console
 from redeye import __version__
 from redeye.backends import BACKENDS, BackendBase
 from redeye.config import Profile
+from redeye.errors import ConfigError
 from redeye.pipeline.stages import (
     s1_attack_surface,
     s1b_structural,
@@ -46,16 +48,25 @@ log = logging.getLogger(__name__)
 
 
 def _skip_for_budget(
-    *, total_cost: float, stage_budget: float, stage_id: str, max_budget: float
+    *,
+    total_cost: float,
+    stage_budget: float,
+    stage_id: str,
+    max_budget: float,
+    dry_run: bool = False,
 ) -> bool:
-    """Should this stage be skipped because the global budget is exhausted?
+    """Should this stage be skipped because the global budget is exhausted,
+    or because this is a dry run?
 
     Skips only *paid* stages (``stage_budget > 0``) and never s9_emit, so a
-    report is always produced for whatever survived.
+    report is always produced for whatever survived. Under ``dry_run`` every
+    paid (LLM) stage is skipped regardless of budget: plan, don't execute.
     """
-    if not max_budget:
-        return False
     if stage_id == "s9_emit":
+        return False
+    if dry_run and stage_budget > 0:
+        return True
+    if not max_budget:
         return False
     return total_cost >= max_budget and stage_budget > 0
 
@@ -98,6 +109,14 @@ class StageContext:
 
     def get_backend(self, role_name: str) -> tuple[BackendBase, str, float | None, int]:
         role = self.profile.roles[role_name]
+        # Documented network kill-switch (SECURITY.md / .env.example): every
+        # backend except `mock` talks to a network service (sdk, openai,
+        # bedrock, vertex, ollama, cli), so refuse to construct them.
+        if os.environ.get("REDEYE_NO_NETWORK") == "1" and role.via != "mock":
+            raise ConfigError(
+                f"REDEYE_NO_NETWORK=1 forbids the network backend {role.via!r} "
+                f"(role {role_name!r}); only the 'mock' backend is allowed."
+            )
         factory = BACKENDS[role.via]
         backend = factory({})
         if self.llm_cache_dir is not None:
@@ -188,6 +207,11 @@ class Orchestrator:
         all_findings: list[Finding] = []
         dropped: list[Finding] = []
 
+        if self.dry_run:
+            self.console.print(
+                "  [yellow]dry run:[/yellow] paid (LLM) stages are planned but not executed."
+            )
+
         for stage_id, stage_fn in _STAGE_ORDER:
             stage_cfg = self.config.stages.get(stage_id)
             if stage_cfg is None:
@@ -203,19 +227,24 @@ class Orchestrator:
                 stage_budget=stage_cfg.max_budget_usd,
                 stage_id=stage_id,
                 max_budget=self.max_budget_usd,
+                dry_run=self.dry_run,
             ):
-                if not manifest.budget_exceeded:
-                    manifest.budget_exceeded = True
-                    self.console.print(
-                        f"  [yellow]budget guardrail tripped[/yellow] "
-                        f"(${manifest.total_cost_usd:.2f} >= ${self.max_budget_usd:.2f}); "
-                        f"skipping remaining paid stages."
-                    )
+                if self.dry_run:
+                    skip_reason = "skipped: dry run (paid stage planned, not executed)"
+                else:
+                    skip_reason = "skipped: global budget exceeded"
+                    if not manifest.budget_exceeded:
+                        manifest.budget_exceeded = True
+                        self.console.print(
+                            f"  [yellow]budget guardrail tripped[/yellow] "
+                            f"(${manifest.total_cost_usd:.2f} >= ${self.max_budget_usd:.2f}); "
+                            f"skipping remaining paid stages."
+                        )
                 manifest.stages.append(
                     StageResult(
                         stage_id=stage_id,
                         skill=stage_cfg.skill,
-                        error="skipped: global budget exceeded",
+                        error=skip_reason,
                     )
                 )
                 continue
@@ -274,16 +303,26 @@ class Orchestrator:
                 # First swap in the adversarial-refined records...
                 all_findings = result.findings or all_findings
                 # ...then run the multi-agent voter, partitioning into kept/dropped.
-                vote_outcome = vote_on_findings(all_findings, self.config)
-                all_findings = vote_outcome.kept
-                # Voting can drop additional findings beyond what S4b/S5 dropped;
-                # extend rather than replace so earlier drops are preserved.
-                dropped.extend(vote_outcome.dropped)
-                result.artifacts["voting_kept"] = len(vote_outcome.kept)
-                result.artifacts["voting_dropped"] = len(vote_outcome.dropped)
-                manifest.hallucination_metrics["voted_out"] = manifest.hallucination_metrics.get(
-                    "voted_out", 0
-                ) + len(vote_outcome.dropped)
+                # A voter crash (e.g. a bad voter role in the profile) must not
+                # abort the run before a manifest/report is written; degrade to
+                # keeping the findings unvoted instead.
+                try:
+                    vote_outcome = vote_on_findings(all_findings, self.config)
+                except Exception as exc:  # noqa: BLE001
+                    log.exception("voting failed; continuing with findings unvoted")
+                    result.artifacts["voting_error"] = f"{type(exc).__name__}: {exc}"
+                else:
+                    all_findings = vote_outcome.kept
+                    # Voting can drop additional findings beyond what S4b/S5
+                    # dropped; extend rather than replace so earlier drops are
+                    # preserved.
+                    dropped.extend(vote_outcome.dropped)
+                    result.artifacts["voting_kept"] = len(vote_outcome.kept)
+                    result.artifacts["voting_dropped"] = len(vote_outcome.dropped)
+                    manifest.hallucination_metrics["voted_out"] = (
+                        manifest.hallucination_metrics.get("voted_out", 0)
+                        + len(vote_outcome.dropped)
+                    )
             elif stage_id == "s6b_validator":
                 # Validator partitions: kept survives, rejected goes to the
                 # dropped pile so the report can show why each one died.

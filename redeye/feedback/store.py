@@ -94,6 +94,10 @@ class FindingsStore:
     # -- write side --------------------------------------------------------
 
     def record_scan(self, *, repo: str, manifest, findings: list) -> str:  # type: ignore[no-untyped-def]
+        # The store persists full manifest/finding JSON (snippets, PoCs,
+        # descriptions) to a long-lived local DB -- redact before writing.
+        from redeye.redaction import redact_obj
+
         scan_id = f"{manifest.target_sha or 'no-sha'}--{manifest.started_at.isoformat()}"
         with closing(self._connect()) as conn, conn:
             conn.execute(
@@ -115,7 +119,7 @@ class FindingsStore:
                     manifest.finding_count,
                     manifest.dropped_count,
                     manifest.total_cost_usd,
-                    json.dumps(manifest.model_dump(mode="json"), default=str),
+                    json.dumps(redact_obj(manifest.model_dump(mode="json")), default=str),
                 ),
             )
             for f in findings:
@@ -145,7 +149,7 @@ class FindingsStore:
                         f.validator_verdict,
                         None,  # reviewer_verdict filled in by collect_feedback
                         None,
-                        json.dumps(f.model_dump(mode="json"), default=str),
+                        json.dumps(redact_obj(f.model_dump(mode="json")), default=str),
                     ),
                 )
         return scan_id

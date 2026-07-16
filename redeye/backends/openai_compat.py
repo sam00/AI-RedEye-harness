@@ -19,8 +19,27 @@ from redeye.backends.mock import MockBackend
 
 log = logging.getLogger(__name__)
 
-_PRICE_PER_MTOK_IN = {"gpt-4o": 5.0, "gpt-4o-mini": 0.15}
-_PRICE_PER_MTOK_OUT = {"gpt-4o": 15.0, "gpt-4o-mini": 0.60}
+# Best-effort price table ($ per million tokens). Override in the profile if
+# precision matters. gpt-5.5 / gpt-5.6 (and the -cyber / -sol variants) are the
+# 2026 premium tier; their prices here are estimates until published rates land.
+# Any model string the endpoint accepts still works (OpenAI-compatible gateways
+# use arbitrary names) -- an unpriced model just falls back to the gpt-4o rate.
+_PRICE_PER_MTOK_IN = {
+    "gpt-4o": 5.0,
+    "gpt-4o-mini": 0.15,
+    "gpt-5.5": 8.0,
+    "gpt-5.5-cyber": 12.0,
+    "gpt-5.6": 10.0,
+    "gpt-5.6-sol": 15.0,
+}
+_PRICE_PER_MTOK_OUT = {
+    "gpt-4o": 15.0,
+    "gpt-4o-mini": 0.60,
+    "gpt-5.5": 24.0,
+    "gpt-5.5-cyber": 36.0,
+    "gpt-5.6": 30.0,
+    "gpt-5.6-sol": 45.0,
+}
 
 
 class OpenAIBackend(BackendBase):

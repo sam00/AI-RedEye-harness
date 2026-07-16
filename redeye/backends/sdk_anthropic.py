@@ -11,6 +11,14 @@ import logging
 import os
 from typing import Any
 
+import httpx
+from tenacity import (
+    Retrying,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
+
 from redeye.backends.base import BackendBase, CompletionResult
 from redeye.backends.mock import MockBackend
 
@@ -18,19 +26,62 @@ log = logging.getLogger(__name__)
 
 # Best-effort price table. Override in the profile if precision matters.
 _PRICE_PER_MTOK_IN = {
-    "claude-sonnet-4-6": 3.0,
-    "claude-haiku-4": 0.80,
-    "claude-opus-4-7": 15.0,
+    "claude-sonnet-5": 3.0,
+    "claude-haiku-4-5-20251001": 0.80,
     "claude-opus-4-8": 15.0,
     "claude-fable-5": 10.0,
 }
 _PRICE_PER_MTOK_OUT = {
-    "claude-sonnet-4-6": 15.0,
-    "claude-haiku-4": 4.0,
-    "claude-opus-4-7": 75.0,
+    "claude-sonnet-5": 15.0,
+    "claude-haiku-4-5-20251001": 4.0,
     "claude-opus-4-8": 75.0,
     "claude-fable-5": 50.0,
 }
+
+# The only valid Anthropic model ids (mid-2026). The SDK forwards the id to the
+# API verbatim; an unknown id 400s and this backend silently degrades to mock,
+# so we warn loudly before the call whenever the id isn't recognised.
+KNOWN_MODEL_IDS = {
+    "claude-opus-4-8",
+    "claude-sonnet-5",
+    "claude-haiku-4-5-20251001",
+    "claude-fable-5",
+}
+
+
+def _is_transient_error(exc: BaseException) -> bool:
+    """True only for errors worth retrying: timeouts, connection drops, 429, 5xx.
+
+    Everything else (a 400 from a bad model id, auth failures, etc.) is a hard
+    error and must fall straight through to the mock fallback -- retrying it
+    would just waste time and money.
+    """
+    if isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
+        return True
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int) and (status == 429 or status >= 500):
+        return True
+    name = type(exc).__name__.lower()
+    return any(k in name for k in ("timeout", "connection", "ratelimit"))
+
+
+def _degrade_to_mock(
+    *, system: str, user: str, model: str, max_tokens: int, temperature: float | None
+) -> CompletionResult:
+    """Run the deterministic mock and label the result truthfully.
+
+    The manifest/provenance must record that this stage ran on ``mock`` -- not
+    the model that was *requested* but never actually produced the output.
+    """
+    result = MockBackend({}).complete(
+        system=system,
+        user=user,
+        model=model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    result.model = "mock"
+    return result
 
 
 class AnthropicSdkBackend(BackendBase):
@@ -83,26 +134,47 @@ class AnthropicSdkBackend(BackendBase):
     ) -> CompletionResult:
         client = self._get_client()
         if client is None or not self.has_credential():
-            return MockBackend({}).complete(
+            log.error(
+                "Anthropic SDK unavailable (missing SDK or credential) — "
+                "STAGE DEGRADED TO MOCK; provenance records model='mock', not %r.",
+                model,
+            )
+            return _degrade_to_mock(
                 system=system,
                 user=user,
                 model=model,
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
+
+        if model not in KNOWN_MODEL_IDS:
+            log.warning("unrecognized Anthropic model id %r — may 400 and fall back to mock", model)
+
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "system": system,
+            "messages": [{"role": "user", "content": user}],
+        }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+
         try:
-            kwargs: dict[str, Any] = {
-                "model": model,
-                "max_tokens": max_tokens,
-                "system": system,
-                "messages": [{"role": "user", "content": user}],
-            }
-            if temperature is not None:
-                kwargs["temperature"] = temperature
-            resp = client.messages.create(**kwargs)
+            retryer = Retrying(
+                retry=retry_if_exception(_is_transient_error),
+                stop=stop_after_attempt(3),
+                wait=wait_exponential(multiplier=1, max=10),
+                reraise=True,
+            )
+            resp = retryer(client.messages.create, **kwargs)
         except Exception as exc:  # noqa: BLE001
-            log.warning("Anthropic SDK call failed (%s) — falling back to mock.", exc)
-            return MockBackend({}).complete(
+            log.error(
+                "Anthropic SDK call failed after retries (%s) — STAGE DEGRADED TO MOCK; "
+                "provenance records model='mock', not the requested %r.",
+                exc,
+                model,
+            )
+            return _degrade_to_mock(
                 system=system,
                 user=user,
                 model=model,

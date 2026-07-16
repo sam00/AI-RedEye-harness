@@ -8,22 +8,22 @@ name: cli
 roles:
   surveyor:
     via: cli
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     max_tokens: 4096
     extra: { tools: [Read, Glob, Grep, Bash] }
   researcher:
     via: cli
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     max_tokens: 8192
     extra: { tools: [Read, Glob, Grep, Bash] }
   adversary:
     via: cli
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     max_tokens: 8192
     extra: { tools: [Read, Glob, Grep, Bash] }
   reporter:
     via: cli
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     max_tokens: 4096
     extra: { tools: [Read] }
 

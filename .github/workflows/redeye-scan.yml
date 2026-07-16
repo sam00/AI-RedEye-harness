@@ -71,15 +71,18 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
           REDEYE_WEBHOOK_URL: ${{ secrets.REDEYE_WEBHOOK_URL }}
           REDEYE_WEBHOOK_TYPE: ${{ vars.REDEYE_WEBHOOK_TYPE || 'slack' }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          # Never expand `${{ }}` inside `run:` -- pass via env instead.
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          if [ -n "${{ secrets.GOOGLE_CREDENTIALS }}" ]; then
-            echo '${{ secrets.GOOGLE_CREDENTIALS }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+          if [ -n "$GOOGLE_CREDENTIALS" ]; then
+            printf '%s\n' "$GOOGLE_CREDENTIALS" > "$GOOGLE_APPLICATION_CREDENTIALS"
           fi
           mkdir -p out .redeye
           redeye scan \
             --repo . \
             --preset pr \
-            --pr-base "origin/${{ github.event.pull_request.base.ref }}" \
+            --pr-base "origin/${PR_BASE_REF}" \
             --output-dir ./out \
             --pr-comment ./out/pr-comment.md \
             ${REDEYE_WEBHOOK_URL:+--webhook-url "$REDEYE_WEBHOOK_URL" --webhook-type "$REDEYE_WEBHOOK_TYPE"}
@@ -88,9 +91,10 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if [ -f ./out/pr-comment.md ]; then
-            gh pr comment "${{ github.event.pull_request.number }}" --body-file ./out/pr-comment.md
+            gh pr comment "$PR_NUMBER" --body-file ./out/pr-comment.md
           fi
 
       - name: Upload artifacts
@@ -124,10 +128,13 @@ jobs:
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
           REDEYE_WEBHOOK_URL: ${{ secrets.REDEYE_WEBHOOK_URL }}
           REDEYE_WEBHOOK_TYPE: ${{ vars.REDEYE_WEBHOOK_TYPE || 'slack' }}
+          # Never expand `${{ }}` inside `run:` -- pass via env instead.
+          SCAN_TARGET: ${{ github.event.inputs.target || '.' }}
+          SCAN_PROFILE: ${{ github.event.inputs.profile || 'full' }}
         run: |
           redeye scan \
-            --repo "${{ github.event.inputs.target || '.' }}" \
-            --profile "${{ github.event.inputs.profile || 'full' }}" \
+            --repo "$SCAN_TARGET" \
+            --profile "$SCAN_PROFILE" \
             --output-dir ./out \
             --store-findings \
             ${REDEYE_WEBHOOK_URL:+--webhook-url "$REDEYE_WEBHOOK_URL" --webhook-type "$REDEYE_WEBHOOK_TYPE"}

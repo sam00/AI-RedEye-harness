@@ -80,8 +80,46 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   interactive report (filter by severity/CWE/grounded); opt-in `--pdf`
   renders a styled PDF (needs `reportlab`). Markdown + SARIF remain the
   defaults. Modules `redeye/output/html.py` and `redeye/output/pdf.py`.
+- **More first-class LLM models.** OpenAI `gpt-5.5`, `gpt-5.5-cyber`,
+  `gpt-5.6`, and `gpt-5.6-sol` are now priced in the OpenAI cost table
+  (best-effort 2026 premium-tier estimates, overridable per profile); any
+  model an OpenAI-compatible endpoint accepts still works. `claude-opus-4-8`
+  ("claude 4.8") remains in the SDK known-set and price table. Guarded by
+  `tests/test_new_models.py`.
+
+### Changed
+- **Anthropic model-id refresh.** Bundled profiles and auto-detection now use
+  `claude-sonnet-5` (was `claude-sonnet-4-6`) and the pinned
+  `claude-haiku-4-5-20251001` (was `claude-haiku-4`); the stale
+  `claude-opus-4-7` price row was dropped. A new `KNOWN_MODEL_IDS` guard warns
+  before an unrecognized id 400s, and `tests/test_model_ids.py` asserts every
+  `claude-*` id in a bundled profile is real.
+- **Loud, truthful backend degradation.** When the SDK/CLI backend can't run
+  (missing creds, bad id, error after retries) it now logs an error and labels
+  the result `model="mock"`, so the manifest never claims a real model produced
+  mock output. SDK calls retry transient failures (timeouts/429/5xx) via
+  tenacity — never 400s/auth.
+- **Two-key HIGH/CRITICAL policy moved S5 → S8c.** Its keys (validator/vote,
+  PoC, corroboration) only exist after later stages, so applying it at the S5
+  policy gate capped *every* HIGH/CRITICAL finding. Now evaluated at S8c;
+  `tests/test_two_key.py` covers it. (A flag still set on S5 is honored.)
+- **Profile referential-integrity validation.** `load_profile` rejects a
+  profile routing a role via an unknown backend, or wiring a stage to an
+  undefined role, with an actionable message — instead of failing deep in the
+  pipeline.
+- **Defense-in-depth redaction.** Secrets are redacted before the LLM cache
+  and SARIF are written to disk; redaction also covers `UPPER_SNAKE` compounds,
+  `Authorization: Bearer` tokens, and `scheme://user:pass@host` URLs. Cache
+  files/dirs are created `0600`/`0700`.
+- **`REDEYE_NO_NETWORK=1` kill-switch** is enforced at backend construction
+  (only `mock` allowed), and webhook URLs are validated against an SSRF guard
+  (blocks loopback/link-local/metadata addresses).
+- **`--dry-run` truly skips paid stages** (a report is still emitted), and a
+  voter crash degrades to "unvoted" instead of aborting the run.
 
 ### Fixed
+- **`redeye eval` crash.** The command constructed `Orchestrator` without the
+  required `application_id`; now passed through, with a regression test.
 - **AST grounding proximity window.** `sink_call_on_line` now defaults to a
   ±1-line window (was ±2), so a finding cited two lines away from the real
   sink is correctly rejected instead of spuriously grounded.

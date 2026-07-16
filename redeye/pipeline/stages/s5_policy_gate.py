@@ -28,53 +28,18 @@ def _drop(finding: Finding, reason: str) -> None:
     finding.tags.append(f"dropped:s5:{reason}")
 
 
-def _second_key(f: Finding) -> bool:
-    """The corroborating 'second key': an independent scanner agreed, or an
-    exploit was concretely demonstrated (syntactically or by the oracle)."""
-    return bool(
-        f.has_external_corroboration()
-        or f.has_concrete_poc()
-        or getattr(f, "poc_demonstrated", False)
-    )
-
-
-def _first_key(f: Finding) -> bool:
-    """The primary 'first key': a distinct validator/adversary confirmed it."""
-    return f.validator_verdict == "confirm" or any(v.verdict == "confirm" for v in f.votes)
-
-
-def _apply_two_key(findings: list[Finding]) -> int:
-    """Improvement #9: a finding may only *report* at HIGH/CRITICAL when it has
-    two independent keys — a model confirmation AND (corroboration OR a
-    demonstrated PoC). Otherwise its severity is capped at MEDIUM (never
-    dropped) and it is tagged for the reviewer. Deterministic, zero LLM cost.
-    Returns the number of findings capped.
-    """
-    capped = 0
-    for f in findings:
-        if f.severity.numeric < Severity.HIGH.numeric:
-            continue
-        if _first_key(f) and _second_key(f):
-            continue
-        f.severity = Severity.MEDIUM
-        if "capped:two-key" not in f.tags:
-            f.tags.append("capped:two-key")
-        capped += 1
-    return capped
-
-
 def run(ctx) -> StageResult:  # type: ignore[no-untyped-def]
     stage_cfg = ctx.profile.stages[ctx.stage_id]
     severity_floor_str = stage_cfg.params.get("severity_floor", "low")
-    two_key = bool(stage_cfg.params.get("two_key_high_severity", False))
     try:
         severity_floor = Severity(severity_floor_str).numeric
     except ValueError:
         severity_floor = Severity.LOW.numeric
 
-    # Enterprise two-key promotion runs first so the severity floor sees the
-    # capped severity, not the model's optimistic one.
-    capped = _apply_two_key(ctx.findings) if two_key else 0
+    # NOTE: the two-key HIGH/CRITICAL policy (``two_key_high_severity``) is
+    # applied at S8c (see s8c_verify), because its keys depend on signals only
+    # later stages produce (validator/votes, corroboration, PoC). Applying it
+    # here would cap *every* HIGH/CRITICAL finding.
 
     kept: list[Finding] = []
     for f in ctx.findings:
@@ -102,6 +67,5 @@ def run(ctx) -> StageResult:  # type: ignore[no-untyped-def]
         artifacts={
             "input_count": len(ctx.findings),
             "kept_count": len(kept),
-            "two_key_capped": capped,
         },
     )

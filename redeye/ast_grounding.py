@@ -35,6 +35,16 @@ _SINK_CALLS: dict[str, frozenset[str]] = {
     "CWE-327": frozenset({"md5", "sha1", "des", "new", "encrypt", "decrypt"}),
 }
 
+# Sink names so common in benign code (``",".join(parts)``, a dict ``.get``,
+# a bare ``run``/``call``/``open``) that a hit only counts when the call is
+# attribute-qualified by a name chain -- ``os.path.join``, ``requests.get``,
+# ``subprocess.run``, ``hashlib.new`` -- never as a bare ``Name`` call or a
+# literal receiver. Unambiguous names (``execute``, ``system``, ``eval``, ...)
+# keep matching as before.
+_AMBIGUOUS_CALLS: frozenset[str] = frozenset(
+    {"get", "post", "send", "run", "call", "join", "new", "open"}
+)
+
 
 def _call_name(node: ast.Call) -> str:
     """Return the callable's tail name: ``foo`` for ``foo(...)``, ``bar`` for
@@ -45,6 +55,18 @@ def _call_name(node: ast.Call) -> str:
     if isinstance(func, ast.Name):
         return func.id
     return ""
+
+
+def _name_qualified(func: ast.expr) -> bool:
+    """True when ``func`` is an attribute access rooted in a plain name
+    (``os.path.join``, ``requests.get``) -- i.e. neither a bare ``Name`` call
+    (``join(...)``) nor a literal receiver (``",".join(...)``)."""
+    if not isinstance(func, ast.Attribute):
+        return False
+    value = func.value
+    while isinstance(value, ast.Attribute):
+        value = value.value
+    return isinstance(value, ast.Name)
 
 
 def sink_call_on_line(source: str, line: int, cwe: str | None, *, window: int = 1) -> bool | None:
@@ -68,6 +90,10 @@ def sink_call_on_line(source: str, line: int, cwe: str | None, *, window: int = 
         node_line = getattr(node, "lineno", None)
         if node_line is None or not (lo <= node_line <= hi):
             continue
-        if _call_name(node).lower() in wanted:
-            return True
+        name = _call_name(node).lower()
+        if name not in wanted:
+            continue
+        if name in _AMBIGUOUS_CALLS and not _name_qualified(node.func):
+            continue
+        return True
     return False

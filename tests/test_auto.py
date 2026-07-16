@@ -48,6 +48,16 @@ _CRED_ENV_VARS = [
     "REDEYE_PROFILE",
 ]
 
+# The only valid Anthropic model ids (mid-2026). The sdk auto-default must be
+# one of these -- an id the API doesn't recognise 400s and silently degrades
+# to mock.
+_VALID_ANTHROPIC_MODEL_IDS = {
+    "claude-opus-4-8",
+    "claude-sonnet-5",
+    "claude-haiku-4-5-20251001",
+    "claude-fable-5",
+}
+
 
 @pytest.fixture(autouse=True)
 def _strip_creds(monkeypatch):
@@ -63,7 +73,9 @@ def test_detect_prefers_anthropic_sdk_when_key_set(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_SDK_API_KEY", "sk-ant-test")
     choice = detect_best_backend(probe_network=False)
     assert choice.backend == "sdk"
-    assert "claude" in choice.model.lower()
+    # Must be a real, current Anthropic id -- not merely a string containing
+    # "claude" -- or the SDK backend 400s and silently degrades to mock.
+    assert choice.model in _VALID_ANTHROPIC_MODEL_IDS
     assert choice.supports_temperature is True
 
 

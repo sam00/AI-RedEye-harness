@@ -9,14 +9,56 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import os
+import socket
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
 log = logging.getLogger(__name__)
+
+
+def _validate_url(url: str) -> bool:
+    """SSRF guard: refuse webhook URLs that point at loopback or link-local /
+    cloud-metadata addresses (127.0.0.0/8, ::1, localhost, 169.254.0.0/16
+    including 169.254.169.254). A poisoned ``REDEYE_WEBHOOK_URL`` must not let
+    the notifier probe internal services from CI.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        log.error("webhook url is not parseable; refusing to post")
+        return False
+    if parsed.scheme not in ("http", "https"):
+        log.error("webhook url scheme %r not allowed (http/https only)", parsed.scheme)
+        return False
+    host = parsed.hostname
+    if not host:
+        log.error("webhook url has no host; refusing to post")
+        return False
+    if host.lower() == "localhost":
+        log.error("webhook url targets localhost; refusing to post")
+        return False
+    try:
+        addrs = [ipaddress.ip_address(host)]
+    except ValueError:
+        # Hostname, not an IP literal: resolve best-effort. If resolution
+        # fails, fall through -- the literal host was already vetted above.
+        try:
+            infos = socket.getaddrinfo(host, None, proto=socket.IPPROTO_TCP)
+            addrs = [ipaddress.ip_address(info[4][0]) for info in infos]
+        except (OSError, ValueError):
+            addrs = []
+    for addr in addrs:
+        addr = getattr(addr, "ipv4_mapped", None) or addr
+        if addr.is_loopback or addr.is_link_local:
+            log.error("webhook url resolves to blocked address %s; refusing to post", addr)
+            return False
+    return True
 
 
 def _compose_payload(
@@ -98,6 +140,8 @@ def post_summary(
     manifest,  # type: ignore[no-untyped-def]
     timeout: float = 10.0,
 ) -> bool:
+    if not _validate_url(url):
+        return False
     payload = _compose_payload(
         kind=kind, target=target, application_id=application_id, manifest=manifest
     )

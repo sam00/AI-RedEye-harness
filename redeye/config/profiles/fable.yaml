@@ -19,7 +19,7 @@ name: fable
 roles:
   surveyor:
     via: sdk
-    model: claude-haiku-4
+    model: claude-haiku-4-5-20251001
     temperature: 0.0
     max_tokens: 4096
   researcher:
@@ -34,13 +34,13 @@ roles:
     max_tokens: 8192
   reporter:
     via: sdk
-    model: claude-haiku-4
+    model: claude-haiku-4-5-20251001
     temperature: 0.0
     max_tokens: 4096
   validator:
     # Cheap, fast model for the single-pass S6.5 TP/FP gate.
     via: sdk
-    model: claude-haiku-4
+    model: claude-haiku-4-5-20251001
     temperature: 0.0
     max_tokens: 1024
 

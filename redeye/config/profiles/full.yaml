@@ -12,17 +12,17 @@ name: full
 roles:
   surveyor:
     via: sdk
-    model: claude-haiku-4
+    model: claude-haiku-4-5-20251001
     temperature: 0.0
     max_tokens: 4096
   researcher:
     via: cli
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     max_tokens: 8192
     extra: { tools: [Read, Glob, Grep, Bash] }
   adversary_a:
     via: sdk
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     temperature: 0.2
     max_tokens: 8192
   adversary_b:
@@ -32,13 +32,13 @@ roles:
     max_tokens: 8192
   reporter:
     via: sdk
-    model: claude-haiku-4
+    model: claude-haiku-4-5-20251001
     temperature: 0.0
     max_tokens: 4096
   validator:
     # Cheap, fast model for the single-pass S6.5 TP/FP gate.
     via: sdk
-    model: claude-haiku-4
+    model: claude-haiku-4-5-20251001
     temperature: 0.0
     max_tokens: 1024
 

@@ -127,5 +127,9 @@ def write_pr_comment(
         for f in findings:
             lines.extend(_render_one(f, scan_id))
 
+    # The comment is posted verbatim to the PR thread -- mask secret material
+    # (descriptions/remediations can quote credentials from the scanned code).
+    from redeye.redaction import redact_secrets
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines), encoding="utf-8")
+    path.write_text(redact_secrets("\n".join(lines)), encoding="utf-8")

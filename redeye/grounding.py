@@ -214,9 +214,7 @@ def ground_one(*, finding: Finding, target: Path) -> Finding:
 
     # Snippet match: do tokens for the claimed CWE family appear in a small
     # window around the cited line?
-    window = _read_window(
-        resolved, primary.start_line, primary.locations[0].end_line if False else primary.end_line
-    )
+    window = _read_window(resolved, primary.start_line, primary.end_line)
     # Improvement #1: for Python targets, confirm the cited line actually
     # contains a *call* to a sink-family function (AST), not just a suggestive
     # token nearby. ast_hit is True/False when we could judge, None otherwise.

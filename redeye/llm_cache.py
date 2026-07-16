@@ -28,9 +28,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from pathlib import Path
 
 from redeye.backends.base import BackendBase, CompletionResult
+from redeye.redaction import redact_secrets
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +60,10 @@ class CachingBackend(BackendBase):
         self.name = f"cached:{getattr(inner, 'name', 'backend')}"
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(self.cache_dir, 0o700)  # cached completions are private
+        except OSError:
+            pass
         self.hits = 0
         self.misses = 0
 
@@ -127,7 +133,9 @@ class CachingBackend(BackendBase):
             path.write_text(
                 json.dumps(
                     {
-                        "text": result.text,
+                        # Model output can quote credentials from the scanned
+                        # code -- never persist it raw.
+                        "text": redact_secrets(result.text),
                         "tokens_in": result.tokens_in,
                         "tokens_out": result.tokens_out,
                         "cost_usd": result.cost_usd,
@@ -136,6 +144,7 @@ class CachingBackend(BackendBase):
                 ),
                 encoding="utf-8",
             )
+            os.chmod(path, 0o600)
         except OSError as exc:
             log.debug("llm cache write failed for %s: %s", key[:12], exc)
         return result

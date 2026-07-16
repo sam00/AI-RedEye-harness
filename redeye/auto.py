@@ -65,7 +65,7 @@ class BackendChoice:
 _QUALITY_UPGRADES: dict[str, str] = {
     "sdk": "claude-fable-5",
     "bedrock": "anthropic.claude-opus-4-5-20251101-v1:0",
-    "cli": "claude-sonnet-4-6",  # CLI can't pin Opus reliably; keep Sonnet
+    "cli": "claude-sonnet-5",  # CLI can't pin Opus reliably; keep Sonnet
     "openai": "gpt-4o",
     "vertex": "gemini-2.5-pro",
     "ollama": "qwen2.5-coder:32b",
@@ -118,7 +118,7 @@ def detect_best_backend(*, probe_network: bool = True) -> BackendChoice:
     if os.environ.get("ANTHROPIC_SDK_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"):
         return BackendChoice(
             backend="sdk",
-            model=_model("claude-sonnet-4-6", "sdk"),
+            model=_model("claude-sonnet-5", "sdk"),
             why="Anthropic SDK key detected",
             supports_temperature=True,
         )
@@ -134,7 +134,7 @@ def detect_best_backend(*, probe_network: bool = True) -> BackendChoice:
     if shutil.which("claude") and not os.environ.get("REDEYE_NO_CLI"):
         return BackendChoice(
             backend="cli",
-            model=_model("claude-sonnet-4-6", "cli"),
+            model=_model("claude-sonnet-5", "cli"),
             why="claude CLI on PATH",
             supports_temperature=False,
         )

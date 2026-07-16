@@ -245,6 +245,7 @@ Operational layer (CI/CD + feedback):
 - **CVSS** — every finding can carry a `cvss_vector` and `cvss_score`; SARIF emits both, plus `security-severity` for GitHub Code Scanning.
 - **New backends** — `bedrock` (AWS Claude), `vertex` (Gemini), `ollama` (local).
 - **Latest Anthropic models** — bundled `fable` profile using `claude-fable-5`, and `claude-opus-4-8` selectable per-role on the `sdk` backend (both priced in the cost table).
+- **OpenAI premium tier** — `gpt-5.5`, `gpt-5.5-cyber`, `gpt-5.6`, and `gpt-5.6-sol` are priced in the OpenAI cost table and selectable per-role on the `openai` backend (any OpenAI-compatible model string also works; unpriced models fall back to the `gpt-4o` rate).
 - **Labeled-benchmark evaluation** — `redeye eval` scores a scan against ground truth (precision / recall / F1 / hallucination rate) with CI gates (`--min-precision`, `--min-recall`, `--max-hallucination`), now wired into the `ci` workflow.
 - **HTML + PDF + flat exports** — besides Markdown and SARIF, findings emit as a self-contained interactive HTML report (verified/corroborated filters, triage-first order, per-stage cost table), a PDF for non-CLI stakeholders, and flat `findings.json` / `findings.csv`.
 - **`redeye report`** — regenerate any report format from an existing `run_manifest.json` with no rescan ($0); `--open` launches the HTML.

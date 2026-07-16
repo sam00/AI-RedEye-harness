@@ -30,6 +30,59 @@ def test_non_secret_text_untouched() -> None:
     assert redact_secrets(text) == text
 
 
+def test_redacts_compound_env_style_keys() -> None:
+    # ``_`` is a word character, so a plain ``\b``-anchored key regex misses
+    # UPPER_SNAKE compounds entirely -- these must all be masked.
+    cases = [
+        "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        "AUTH_TOKEN=abcdef1234567890",
+        "AZURE_CLIENT_SECRET=s3cr3tvalue",
+        "SECRET_KEY=django-insecure-abc123def456",
+    ]
+    for line in cases:
+        key, value = line.split("=", 1)
+        out = redact_secrets(line)
+        assert key in out  # key name preserved
+        assert value not in out
+        assert MASK in out
+
+
+def test_redacts_short_credential_values() -> None:
+    out = redact_secrets("pwd=abc12")
+    assert "pwd" in out
+    assert "abc12" not in out
+    assert MASK in out
+
+
+def test_redacts_client_secret_assignment() -> None:
+    out = redact_secrets("client_secret: 9a8b7c6d5e4f0011")
+    assert "client_secret" in out
+    assert "9a8b7c6d5e4f0011" not in out
+    assert MASK in out
+
+
+def test_redacts_bearer_tokens() -> None:
+    out = redact_secrets("Authorization: Bearer abcdef1234567890ABCDEF")
+    assert "Bearer" in out  # scheme word preserved
+    assert "abcdef1234567890ABCDEF" not in out
+    assert MASK in out
+
+
+def test_redacts_credentials_in_urls() -> None:
+    out = redact_secrets("DATABASE_URL=postgres://u:SuperSecretPass@db:5432/app")
+    assert "SuperSecretPass" not in out
+    assert MASK in out
+    assert "db:5432/app" in out  # non-secret URL parts preserved
+
+
+def test_ordinary_code_lines_untouched() -> None:
+    for line in (
+        "def get(self, url): return self.session.get(url)",
+        "x = compute_total(items)",
+    ):
+        assert redact_secrets(line) == line
+
+
 def test_markdown_report_redacts_by_default(tmp_path: Path) -> None:
     f = Finding(
         id="F-0001",

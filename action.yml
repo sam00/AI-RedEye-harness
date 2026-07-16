@@ -58,22 +58,37 @@ runs:
 
     - name: Install RedEye
       shell: bash
-      run: pip install "${{ github.action_path }}"
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: pip install "$ACTION_PATH"
 
+    # Inputs are passed via `env:` and referenced as shell variables -- never
+    # interpolate `${{ }}` inside `run:` (shell/command injection).
     - name: Run RedEye scan
       id: scan
       shell: bash
+      env:
+        REPO: ${{ inputs.repo }}
+        PROFILE: ${{ inputs.profile }}
+        PRESET: ${{ inputs.preset }}
+        OUT: ${{ inputs.output-dir }}
+        DIFF_ONLY: ${{ inputs.diff-only }}
+        PR_BASE: ${{ inputs.pr-base }}
+        MAX_COST: ${{ inputs.max-cost }}
+        EXTRA: ${{ inputs.extra-args }}
       run: |
         set -euo pipefail
-        ARGS=(scan --repo "${{ inputs.repo }}" --output-dir "${{ inputs.output-dir }}")
-        if [ -n "${{ inputs.preset }}" ]; then ARGS+=(--preset "${{ inputs.preset }}"); fi
-        ARGS+=(--profile "${{ inputs.profile }}")
-        if [ "${{ inputs.diff-only }}" = "true" ]; then ARGS+=(--diff-only --pr-base "${{ inputs.pr-base }}"); fi
-        if [ "${{ inputs.max-cost }}" != "0" ]; then ARGS+=(--max-cost "${{ inputs.max-cost }}"); fi
-        # shellcheck disable=SC2206
-        ARGS+=(${{ inputs.extra-args }})
+        ARGS=(scan --repo "$REPO" --output-dir "$OUT")
+        if [ -n "$PRESET" ]; then ARGS+=(--preset "$PRESET"); fi
+        ARGS+=(--profile "$PROFILE")
+        if [ "$DIFF_ONLY" = "true" ]; then ARGS+=(--diff-only --pr-base "$PR_BASE"); fi
+        if [ "$MAX_COST" != "0" ]; then ARGS+=(--max-cost "$MAX_COST"); fi
+        if [ -n "$EXTRA" ]; then
+          read -ra EXTRA_ARR <<< "$EXTRA"
+          ARGS+=("${EXTRA_ARR[@]}")
+        fi
         redeye "${ARGS[@]}"
-        SARIF=$(ls -1 "${{ inputs.output-dir }}"/*.sarif 2>/dev/null | head -n1 || true)
+        SARIF=$(ls -1 "$OUT"/*.sarif 2>/dev/null | head -n1 || true)
         echo "sarif-path=${SARIF}" >> "$GITHUB_OUTPUT"
 
     - name: Upload SARIF to code scanning

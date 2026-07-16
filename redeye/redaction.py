@@ -15,8 +15,11 @@ safe to publish without human review.
 from __future__ import annotations
 
 import re
+from typing import TypeVar, cast
 
 MASK = "***REDACTED***"
+
+_T = TypeVar("_T")
 
 # Whole-block / well-known credential shapes. Order matters: PEM blocks first.
 _PATTERNS: list[re.Pattern[str]] = [
@@ -41,13 +44,23 @@ _PATTERNS: list[re.Pattern[str]] = [
 ]
 
 # ``key = value`` / ``key: value`` for sensitive key names -> mask the value,
-# keep the key so the report still reads sensibly.
+# keep the key so the report still reads sensibly. The key may be a compound
+# name (``AWS_SECRET_ACCESS_KEY``, ``db.password``) as long as it *ends* with
+# a sensitive word -- ``\b`` alone misses UPPER_SNAKE compounds because ``_``
+# is a word character.
 _ASSIGNMENT_RE = re.compile(
-    r"(?i)\b(api[_-]?key|secret|secret[_-]?key|access[_-]?key|token|"
-    r"password|passwd|pwd|client[_-]?secret|private[_-]?key)\b"
+    r"(?i)(?<![A-Za-z0-9_.\-])"
+    r"([A-Za-z0-9_.\-]*(?:password|passwd|pwd|secret|secret[_-]?key|token|"
+    r"api[_-]?key|access[_-]?key|client[_-]?secret|private[_-]?key))"
     r"(\s*[:=]\s*)"
-    r"(['\"]?)([^'\"\s,;}{]{6,})(\3)"
+    r"(['\"]?)([^'\"\s,;}{]{4,})(\3)"
 )
+
+# ``Authorization: Bearer <token>`` -- keep the scheme word, mask the token.
+_BEARER_RE = re.compile(r"(?i)\b(bearer\s+)([A-Za-z0-9._~+/=-]{8,})")
+
+# Credentials embedded in URLs (``scheme://user:password@host``) -> mask the password.
+_URL_CREDS_RE = re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://[^/\s:@'\"]+:)([^/\s@'\"]+)@")
 
 
 def _mask_assignment(m: re.Match[str]) -> str:
@@ -61,13 +74,18 @@ def redact_secrets(text: str) -> str:
     out = text
     for pat in _PATTERNS:
         out = pat.sub(MASK, out)
+    out = _BEARER_RE.sub(rf"\g<1>{MASK}", out)
+    out = _URL_CREDS_RE.sub(rf"\g<1>{MASK}@", out)
     out = _ASSIGNMENT_RE.sub(_mask_assignment, out)
     return out
 
 
-def redact_obj(obj: object) -> object:
+def redact_obj(obj: _T) -> _T:
     """Recursively redact secret material in the string values of a JSON-like
     object (dicts, lists, scalars).
+
+    Generic in the input type so callers keep their static type (e.g. a SARIF
+    ``dict`` stays a ``dict``); the ``cast`` calls are no-ops at runtime.
 
     This is the JSON-safe entry point: redaction must run on the *structure*
     (before serialization), never on serialized JSON text. Running the
@@ -78,9 +96,9 @@ def redact_obj(obj: object) -> object:
     valid JSON.
     """
     if isinstance(obj, str):
-        return redact_secrets(obj)
+        return cast(_T, redact_secrets(obj))
     if isinstance(obj, dict):
-        return {k: redact_obj(v) for k, v in obj.items()}
+        return cast(_T, {k: redact_obj(v) for k, v in obj.items()})
     if isinstance(obj, list):
-        return [redact_obj(v) for v in obj]
+        return cast(_T, [redact_obj(v) for v in obj])
     return obj

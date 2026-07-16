@@ -40,7 +40,7 @@ class Role(BaseModel):
     """One logical role (e.g. `surveyor`, `researcher`, `adversary`)."""
 
     via: str = Field(..., description="Backend name: cli | sdk | openai | mock")
-    model: str = Field(..., description="Model identifier, e.g. claude-sonnet-4-6")
+    model: str = Field(..., description="Model identifier, e.g. claude-sonnet-5")
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     max_tokens: int = Field(default=4096, ge=128)
     extra: dict[str, Any] = Field(default_factory=dict)
@@ -107,6 +107,33 @@ def _candidate_paths(profile: str | None) -> tuple[list[Path], bool]:
     return candidates, strict
 
 
+def _validate_profile(profile: Profile) -> None:
+    """Referential-integrity gate for a parsed profile.
+
+    A profile that routes a role through a backend we don't ship, or wires a
+    stage to a role the profile never defines, would otherwise blow up deep in
+    the pipeline (or silently misroute). Catch both at load time with a clear,
+    actionable message listing the valid choices.
+    """
+    from redeye.backends import BACKENDS  # lazy import avoids an import cycle
+
+    valid_backends = ", ".join(sorted(BACKENDS))
+    for role_name, role in profile.roles.items():
+        if role.via not in BACKENDS:
+            raise ConfigError(
+                f"{profile.source_path}: role {role_name!r} routes via unknown backend "
+                f"{role.via!r}. Valid backends: {valid_backends}."
+            )
+
+    valid_roles = ", ".join(sorted(profile.roles))
+    for stage_name, stage in profile.stages.items():
+        if stage.role not in profile.roles:
+            raise ConfigError(
+                f"{profile.source_path}: stage {stage_name!r} references unknown role "
+                f"{stage.role!r}. Valid roles: {valid_roles}."
+            )
+
+
 def load_profile(profile: str | None = None) -> Profile:
     """Resolve and load a profile. Raises :class:`ConfigError` on failure.
 
@@ -153,7 +180,7 @@ def load_profile(profile: str | None = None) -> Profile:
             roles = {k: Role(**v) for k, v in (raw.get("roles") or {}).items()}
             stages = {k: Stage(**v) for k, v in (raw.get("stages") or {}).items()}
             voting_raw = raw.get("voting") or {}
-            return Profile(
+            profile_obj = Profile(
                 name=raw.get("name") or candidate.stem,
                 source_path=str(candidate),
                 roles=roles,
@@ -163,6 +190,11 @@ def load_profile(profile: str | None = None) -> Profile:
         except Exception as exc:  # noqa: BLE001
             last_error = exc
             continue
+
+        # Runs outside the try so a referential-integrity ConfigError surfaces
+        # clearly instead of being swallowed as "last_error" and retried.
+        _validate_profile(profile_obj)
+        return profile_obj
 
     if last_error is not None:
         raise ConfigError(f"Failed to load any profile: {last_error}")

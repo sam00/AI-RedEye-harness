@@ -208,6 +208,11 @@ def build_sarif_log(*, target: Path, findings: list[Finding]) -> dict:
 
 def write_sarif(*, path: Path, target: Path, findings: list[Finding]) -> None:
     log = build_sarif_log(target=target, findings=findings)
+    # The SARIF embeds raw snippets / PoC payloads / descriptions and is
+    # uploaded to code scanning and as an artifact -- never write raw secrets.
+    from redeye.redaction import redact_obj
+
+    log = redact_obj(log)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:
         json.dump(log, fh, indent=2)

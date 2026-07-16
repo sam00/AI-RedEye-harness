@@ -28,7 +28,7 @@
       "type": "object"
     },
     "Finding": {
-      "description": "A single triage candidate produced by the pipeline.\n\nFindings are immutable once emitted \u2014 stages that ``refine`` a finding\nconstruct a new one with the same ``id`` and a bumped revision count.",
+      "description": "A single triage candidate produced by the pipeline.\n\nFindings are immutable once emitted — stages that ``refine`` a finding\nconstruct a new one with the same ``id`` and a bumped revision count.",
       "properties": {
         "attack_chain": {
           "description": "Ordered narrative of how an attacker reaches the sink.",
